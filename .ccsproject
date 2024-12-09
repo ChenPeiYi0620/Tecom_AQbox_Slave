@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?ccsproject version="1.0"?>
+<projectOptions>
+	<deviceFamily value="C2000"/>
+	<isTargetManual value="true"/>
+	<origin value="C:/ti/workspace_yi/archives/MonoMtrServo_377s_20221003"/>
+	<sourceLookupPath value=""/>
+</projectOptions>
