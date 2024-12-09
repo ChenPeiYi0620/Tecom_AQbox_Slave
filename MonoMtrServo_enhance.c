@@ -2114,7 +2114,7 @@ interrupt void scibRxFifoIsr(void)
             //circular buffer for FAST data  。
             cb_index=head1 +sci_count*2;
             cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
-            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(0.6*32768)+32767;                   //Speed_F.Speed, pu
+            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(0.5*32768)+32767;                   //Speed_F.Speed, pu
             FAST_data[1]=data_transmit_test ? update_FAST_en : (Uint16)(1*32768)+32767;  //Torq_est, pu
             FAST_data[2]=data_transmit_test ? sci_count  : (Uint16)(0.7*32768)+32767;              //Power W, PU
             FAST_data[3]=data_transmit_test ? cb_index  : cb_index;                             //Idle
