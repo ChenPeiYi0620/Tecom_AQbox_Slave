@@ -147,7 +147,10 @@ void InitEcapGpio(void)
        GPIO_SetupPinOptions(Ecap6_GPIO, GPIO_INPUT, GPIO_QUAL3);
        GPIO_SetupPinMux(Ecap6_GPIO, 0, Ecap6_MUX);
 
-//       GpioCtrlRegs.GPACTRL.bit.QUALPRD0=0x02;
+       EALLOW;
+       GpioCtrlRegs.GPACTRL.bit.QUALPRD0=0x0E; // 10*1/100M s= 100ns clock base, thus the AQ window is 100*3=300ns
+       EDIS;
+
        return;
 }
 
