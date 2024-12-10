@@ -62,6 +62,19 @@ Default initalizer for the PARK object.
                           0, \
                           }
 
+//typedef struct
+//{
+//    Uint32 CAP1;
+//    Uint32 CAP2;
+//    Uint32 CAP3;
+//    Uint32 CAP4;
+//    Uint32 last_CAP1;
+//    Uint32 last_CAP2;
+//    Uint32 last_CAP3;
+//    Uint32 last_CAP4;
+//} PWM_pack;
+
+
 float lastPWM_duty(float *ref1_cap2_last, float *ref1_cap4_last, float CAP2,
                    float CAP4);
 void LinetoPhase(_iq Line_A, _iq Line_B, CLARKE *phase_volt);

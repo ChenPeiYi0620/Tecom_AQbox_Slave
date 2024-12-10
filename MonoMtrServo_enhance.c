@@ -1503,58 +1503,58 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     // --------------------------------------------------------------------------------
     //variable of polar correction
     ////    voltage reconstruction
-    phase_volt1_past=phase_volt1;//嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝��
-    phase_volt2_past=phase_volt2;//嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝
-    ref_past1 = ref_volt1;       //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���嚙踐���
-    ref_past2 = ref_volt2;       //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���嚙踐���
-    ref_past3 = ref_volt3;       //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���嚙踐���
-    //
-    //���蕭��ap���嚙踐WM嚙踝蕭謅��AP1,CAP3���PWM���雓捕�嚙踐���蕭謚渲嚙踐的���AP2,CAP4���PWM���嚙踝蕭豲鞈察縈�頩偌�嚙踐的���ㄟ嚙踝蕭嚙�(CAP1+CAP3)/(CAP1+CAP2+CAP3+CAP4)���嚙踐�蕭����縣嚙踝��蕭
-    ref_volt1_dir = _IQdiv((_iq)(ECap1Regs.CAP2 + ECap1Regs.CAP4) , (_iq)(ECap1Regs.CAP1 + ECap1Regs.CAP2 + ECap1Regs.CAP3 + ECap1Regs.CAP4));
-    ref_volt2_dir = _IQdiv((_iq)(ECap3Regs.CAP2 + ECap3Regs.CAP4) , (_iq)(ECap3Regs.CAP1 + ECap3Regs.CAP2 + ECap3Regs.CAP3 + ECap3Regs.CAP4));
-    ref_volt3_dir = _IQdiv((_iq)(ECap5Regs.CAP2 + ECap5Regs.CAP4) , (_iq)(ECap5Regs.CAP1 + ECap5Regs.CAP2 + ECap5Regs.CAP3 + ECap5Regs.CAP4));
-    phase_volt1_dir = _IQdiv((_iq)(ECap2Regs.CAP2 + ECap2Regs.CAP4) ,(_iq)(ECap2Regs.CAP1 + ECap2Regs.CAP2 + ECap2Regs.CAP3 + ECap2Regs.CAP4));
-    phase_volt2_dir = _IQdiv((_iq)(ECap4Regs.CAP2 + ECap4Regs.CAP4) ,(_iq)(ECap4Regs.CAP1 + ECap4Regs.CAP2 + ECap4Regs.CAP3 + ECap4Regs.CAP4));
-    phase_volt3_dir = _IQdiv((_iq)(ECap6Regs.CAP2 + ECap6Regs.CAP4) ,(_iq)(ECap6Regs.CAP1 + ECap6Regs.CAP2 + ECap6Regs.CAP3 + ECap6Regs.CAP4));
+    phase_volt1_past = phase_volt1; // Store the previous value of phase voltage 1
+    phase_volt2_past = phase_volt2; // Store the previous value of phase voltage 2
+    ref_past1 = ref_volt1;         // Store the previous value of reference voltage 1
+    ref_past2 = ref_volt2;         // Store the previous value of reference voltage 2
+    ref_past3 = ref_volt3;         // Store the previous value of reference voltage 3
 
-    ref_volt1=lastPWM_duty(&ref1_cap2_last,&ref1_cap4_last,(_iq)ECap1Regs.CAP2,(_iq)ECap1Regs.CAP4)/PWM_length;
-    ref_volt2=lastPWM_duty(&ref2_cap2_last,&ref2_cap4_last,(_iq)ECap3Regs.CAP2,(_iq)ECap3Regs.CAP4)/PWM_length;
-    ref_volt3=lastPWM_duty(&ref3_cap2_last,&ref3_cap4_last,(_iq)ECap5Regs.CAP2,(_iq)ECap5Regs.CAP4)/PWM_length;
-    phase_volt1=lastPWM_duty(&phase1_cap2_last,&phase1_cap4_last,(_iq)ECap2Regs.CAP2,(_iq)ECap2Regs.CAP4)/PWM_length;
-    phase_volt2=lastPWM_duty(&phase2_cap2_last,&phase2_cap4_last,(_iq)ECap4Regs.CAP2,(_iq)ECap4Regs.CAP4)/PWM_length;
-    phase_volt3=lastPWM_duty(&phase3_cap2_last,&phase3_cap4_last,(_iq)ECap6Regs.CAP2,(_iq)ECap6Regs.CAP4)/PWM_length;
+    float duty_numerator = PWM_length;// (_iq)(ECap1Regs.CAP1 + ECap1Regs.CAP2 + ECap1Regs.CAP3 + ECap1Regs.CAP4);
+    ref_volt1_dir = _IQdiv((_iq)(ECap1Regs.CAP2 + ECap1Regs.CAP4) , duty_numerator);
+    ref_volt2_dir = _IQdiv((_iq)(ECap3Regs.CAP2 + ECap3Regs.CAP4) , duty_numerator);
+    ref_volt3_dir = _IQdiv((_iq)(ECap5Regs.CAP2 + ECap5Regs.CAP4) , duty_numerator);
+    phase_volt1_dir = _IQdiv((_iq)(ECap2Regs.CAP2 + ECap2Regs.CAP4) , duty_numerator);
+    phase_volt2_dir = _IQdiv((_iq)(ECap4Regs.CAP2 + ECap4Regs.CAP4) , duty_numerator);
+    phase_volt3_dir = _IQdiv((_iq)(ECap6Regs.CAP2 + ECap6Regs.CAP4) , duty_numerator);
+
+    int integration_mode=1;
+    ref_volt1= integration_mode ? ref_volt1_dir : lastPWM_duty(&ref1_cap2_last,&ref1_cap4_last,(_iq)ECap1Regs.CAP2,(_iq)ECap1Regs.CAP4)/PWM_length;
+    ref_volt2= integration_mode ? ref_volt2_dir : lastPWM_duty(&ref2_cap2_last,&ref2_cap4_last,(_iq)ECap3Regs.CAP2,(_iq)ECap3Regs.CAP4)/PWM_length;
+    ref_volt3= integration_mode ? ref_volt3_dir : lastPWM_duty(&ref3_cap2_last,&ref3_cap4_last,(_iq)ECap5Regs.CAP2,(_iq)ECap5Regs.CAP4)/PWM_length;
+    phase_volt1= integration_mode ? phase_volt1_dir : lastPWM_duty(&phase1_cap2_last,&phase1_cap4_last,(_iq)ECap2Regs.CAP2,(_iq)ECap2Regs.CAP4)/PWM_length;
+    phase_volt2= integration_mode ? phase_volt2_dir : lastPWM_duty(&phase2_cap2_last,&phase2_cap4_last,(_iq)ECap4Regs.CAP2,(_iq)ECap4Regs.CAP4)/PWM_length;
+    phase_volt3= integration_mode ? phase_volt3_dir : lastPWM_duty(&phase3_cap2_last,&phase3_cap4_last,(_iq)ECap6Regs.CAP2,(_iq)ECap6Regs.CAP4)/PWM_length;
 
     //variable adjustment with speed
     wehz = we_f/2/PI;
 
-    inv1_past = inv1; //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���雓�嚙踐������
-    inv2_past = inv2; //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���雓�嚙踐������
-    inv3_past = inv3; //嚙踐�洽蝬質嚙踝蕭��嚙踝蕭謖嚙踝蕭�嚙踐�雓�縣嚙踝�蕭嚙踝���雓�嚙踐������
+    inv1_past = inv1; // Store the previous value of inv1
+    inv2_past = inv2; // Store the previous value of inv2
+    inv3_past = inv3; // Store the previous value of inv3
 
-
-    //      ������嚙踝蕭�嚙踐�嚙踝���蕭�嚙踐漕����                            嚙踝蕭�����蕭��嚙踐���嚙踐�蕭�雓���蕭                               ����蕭嚙踐童瞍勗��蕭����蕭
-    if(ref_past1==ref_volt1 && ref_volt1<modify1 && trig1 == 1){
+    // Check for stable conditions and adjust voltage inversion state for ref_volt1
+    if (ref_past1 == ref_volt1 && ref_volt1 < modify1 && trig1 == 1) {
         inv1 = -1;
-    }
-    else {
+    } else {
         inv1 = 1;
-        if(ref_past2!=ref_volt2)//嚙踐���縣嚙踝�蕭嚙踝����蕭嚙踝����嚙踝蕭蹓選��,ab����蕭嚙踐童嚙踐���蕭0���雓嚙踐嚙踐�蕭豯株嚙踝蕭蹓選��
+        if (ref_past2 != ref_volt2) // Detect change in ref_volt2 to reset trigger for ref_volt1
             trig1 = 1;
-        if(inv1_past!=inv1) //���雓�雓�嚙踐ㄝ���(嚙踝蕭��蕭豯殷蕭�嚙踝�)嚙踝蕭謅�謑剖��蕭謍綽蕭�����竣
+        if (inv1_past != inv1) // Reset trigger when inversion state changes
             trig1 = 0;
     }
-    if(ref_past2==ref_volt2 && ref_volt2<modify1 && trig2 == 1){
+
+    // Check for stable conditions and adjust voltage inversion state for ref_volt2
+    if (ref_past2 == ref_volt2 && ref_volt2 < modify1 && trig2 == 1) {
         inv2 = -1;
-    }
-    else {
+    } else {
         inv2 = 1;
-        if(ref_past3!=ref_volt3)
+        if (ref_past3 != ref_volt3) // Detect change in ref_volt3 to reset trigger for ref_volt2
             trig2 = 1;
-        if(inv2_past!=inv2)
+        if (inv2_past != inv2) // Reset trigger when inversion state changes
             trig2 = 0;
     }
 
-    //嚙踝蕭蹎剁���蕭蹓選�賢��縣嚙踝�蕭謇勗��蕭��嚙踝蕭��嚙踝蕭謚湛蕭蹐縣嚙踝��蕭
+    // Adjust phase voltage direction based on inversion state
     phase_volt1_dir=phase_volt1_dir*inv1;
     phase_volt2_dir=phase_volt2_dir*inv2;
     phase_volt1=phase_volt1*inv1; //V_ab
@@ -1945,7 +1945,7 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 3:
-            dacAval = (Uint16) _IQtoQ11(ref_volt1 + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(ref_volt1_dir + _IQ(1));
             dacBval = (Uint16) _IQtoQ11(phase_volt1 + _IQ(1));
             break;
 

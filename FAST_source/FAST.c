@@ -7,6 +7,12 @@
 #include "FAST.h"
 
 
+// function to reduce glitch effect
+//float PWM_deglitch(Uint32 *CAP2, Uint32 *CAP4, Uint32 *last_CAP2, Uint32 *last_CAP4 ){
+//    if *CAP2
+//}
+
+
 float lastPWM_duty(float *ref1_cap2_last,float *ref1_cap4_last,float CAP2,float CAP4){
     float PWM_duty;
     float err1=_IQabs(CAP2-CAP4);
