@@ -288,8 +288,8 @@ DLOG_4CH_F dlog_4ch1;
 // ******************************************************************************
 inline void motorCurrentSense()
 {
-    motor1.currentAs = (float)IFB_A1*ADC_PU_SCALE_FACTOR-Cur_OffsetA; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    motor1.currentBs = (float)IFB_B1*ADC_PU_SCALE_FACTOR-Cur_OffsetB; //(float)IFB_B1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+    motor1.currentAs = (float) AdcaResultRegs.ADCRESULT0*ADC_PU_SCALE_FACTOR-Cur_OffsetA; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+    motor1.currentBs = (float) AdccResultRegs.ADCRESULT0*ADC_PU_SCALE_FACTOR-Cur_OffsetB; //(float)IFB_B1_PPB* ADC_PU_PPB_SCALE_FACTOR;
     motor1.currentCs = -motor1.currentAs - motor1.currentBs;
 
     return;
@@ -694,7 +694,7 @@ void main(void){
 
 
 
-    // Motor 1: Ia  @ A0
+    // Motor 1: Ia  @ A channel 2, SOC 0
     // ********************************
     AdcaRegs.ADCSOC0CTL.bit.CHSEL     =  2;                    // SOC0 will convert pin A0
     AdcaRegs.ADCSOC0CTL.bit.ACQPS     = 50;                    // sample window in SYSCLK cycles
@@ -703,14 +703,14 @@ void main(void){
     AdcaRegs.ADCPPB1CONFIG.bit.CONFIG = 0;                     // PPB is associated with SOC0
     AdcaRegs.ADCPPB1OFFCAL.bit.OFFCAL = 0;                     // Write zero to this for now till offset ISR is run
 
-    // Motor 1: Ib  @ B3
+    // Motor 1: Ib  @ C channel 2, SOC 0
     // ********************************
-    AdcbRegs.ADCSOC0CTL.bit.CHSEL     =  2;                    // SOC0 will convert pin B3
-    AdcbRegs.ADCSOC0CTL.bit.ACQPS     = 50;                    // sample window in SYSCLK cycles
-    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL   = ADCTRIG11_EPWM4SOCA;   // trigger on ePWM2 SOCA/C
+    AdccRegs.ADCSOC0CTL.bit.CHSEL     =  2;                    // SOC0 will convert pin B3
+    AdccRegs.ADCSOC0CTL.bit.ACQPS     = 50;                    // sample window in SYSCLK cycles
+    AdccRegs.ADCSOC0CTL.bit.TRIGSEL   = ADCTRIG11_EPWM4SOCA;   // trigger on ePWM2 SOCA/C
     // Configure the post processing block (PPB) to eliminate subtraction related calculation
-    AdcbRegs.ADCPPB1CONFIG.bit.CONFIG = 0;                     // PPB is associated with SOC0
-    AdcbRegs.ADCPPB1OFFCAL.bit.OFFCAL = 0;                     // Write zero to this for now till offset ISR is run
+    AdccRegs.ADCPPB1CONFIG.bit.CONFIG = 0;                     // PPB is associated with SOC0
+    AdccRegs.ADCPPB1OFFCAL.bit.OFFCAL = 0;                     // Write zero to this for now till offset ISR is run
 
     //  // Motor 1: Ic  @ A1
     //  // ********************************
@@ -750,14 +750,14 @@ void main(void){
     //TODO ISR Mapping
     // ****************************************************************************
     // ****************************************************************************
-    // ADC B EOC of SOC1 is used to trigger Motor control Interrupt
-    AdcbRegs.ADCINTSEL1N2.bit.INT1SEL  = 0;
-    AdcbRegs.ADCINTSEL1N2.bit.INT1CONT = 1;
-    AdcbRegs.ADCINTSEL1N2.bit.INT1E    = 1;
+    // ADC A EOC of SOC1 is used to trigger Motor control Interrupt
+    AdcaRegs.ADCINTSEL1N2.bit.INT1SEL  = 0;
+    AdcaRegs.ADCINTSEL1N2.bit.INT1CONT = 1;
+    AdcaRegs.ADCINTSEL1N2.bit.INT1E    = 1;
 
-    PieVectTable.ADCB1_INT         = &MotorControlISR;
+    PieVectTable.ADCA1_INT         = &MotorControlISR;
     //  PieVectTable.TIMER0_INT = &cpu_timer0_isr;
-    PieCtrlRegs.PIEIER1.bit.INTx2  = 1;  // Enable ADCB1INT in PIE group 1
+    PieCtrlRegs.PIEIER1.bit.INTx1  = 1;  // Enable ADCA1INT in PIE group 1
 
 
 
@@ -1839,8 +1839,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha*32768+32768));
         updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta*32768+32768));
         //data buffer 5-6 for FAST
-        updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, (Uint16)(temp_data1));
-        updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, (Uint16)(temp_data2));
+        updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, (Uint16)(mag_flux.Alpha*32768+32767));
+        updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, (Uint16)(mag_flux.Beta*32768+32767));
 
         //Updating the rs485 package blocks
 
@@ -1935,8 +1935,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
     switch (dac_out) {
         case 1:
-            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.Alpha + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Beta + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale * motor1.currentAs + _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * motor1.currentBs + _IQ(1));
             break;
 
         case 2:
@@ -2171,7 +2171,7 @@ interrupt void scibRxFifoIsr(void)
             H_8bits = ReceivedChar[5] & 0xFF;
             L_8bits = ReceivedChar[6] & 0xFF;
             Ls_U16 = ((Uint16)H_8bits << 8) | L_8bits;;
-            Flux_Rs=(float)Rs_U16/65535*10;
+            Flux_Rs=(float)Rs_U16/65535*20;
             Ls=(float)Ls_U16/65535;
             // enable fast update
             update_FAST_en=1;
