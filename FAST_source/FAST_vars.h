@@ -54,6 +54,8 @@ extern float phase1_cap2_last,phase1_cap4_last,phase2_cap2_last,phase2_cap4_last
 #define PWM_length 20000;
 extern float ref_theta;
 extern float inv1,inv2,inv3,inv1_past,inv2_past,inv3_past;
+extern float vol_filter_thres;
+
 extern Uint32 last_count,corr_count;
 //Uint32 capturecount1,capturecount2,capturecount3,capturecount4,capturecount5,capturecount6,capturecount7,capturecount8;
 extern float32 capturecountthreshold3,capturecountthreshold4;
@@ -75,9 +77,8 @@ extern float Last_current_As,Last_current_Bs;
 extern float clarke_Alpha_lpf,clarke_Beta_lpf;
 extern float clarke_Alphafloat,clarke_Betafloat;
 extern float V_A,V_B,I_A,I_B;
-extern float Emf_A,Emf_B,Emf_A_lpf2,Emf_B_lpf2,Emf_A_last,Emf_B_last,Emf_A_lpf_last,Emf_B_lpf_last;
+extern float Emf_A_lpf2,Emf_B_lpf2,Emf_A_last,Emf_B_last,Emf_A_lpf_last,Emf_B_lpf_last;
 extern float Emf_A_lpf_f,Emf_B_lpf_f,Emf_A_lpf_last_f,Emf_B_lpf_last_f,Emf_A_last_f,Emf_B_last_f,Emf_A_lpf,Emf_B_lpf;
-extern float Emf_mag;
 extern EMF EMF1, Current_lpf;
 extern IPARK Emf_ab_lpf,Emf_ab_lpf2;
 extern float we,intgrBW;
@@ -111,7 +112,7 @@ extern float Torque_DB,Torque_DB_sum,Torque_DB_avg;
 extern float torq_count,torq_i;
 extern float currentAs,currentBs;
 extern float Speed_est,Speed_est_sum,Speed_est_avg,Cur_measure,Cur_measure_sum,Cur_measure_avg;
-extern float Power1,Power2,Power3;
+extern float Power1,Power1_avg,Power1_avg_last;
 extern float Speed_est_normal,we_est,we_mech;
 extern int avg_load2;
 
@@ -171,7 +172,7 @@ extern float LD_magcomp,LD_phase_comp,LD_harm;
 extern float UD_feature[2],LD_feature[2],UD_feature_avg[2],LD_feature_avg[2],UD_feature_avg_last[2],LD_feature_avg_last[2],HI_demag[4];
 extern float flux_energy,flux_energy_last;
 extern Uint16 avg_count1,avg_limit1,avg_load1;
-extern float avg_test,avg_test_last;
+extern float avg_test,avg_test_last,rms_test,rms_last;
 extern float UD_mag,LD_mag;
 extern IPARK mag_flux;
 extern float F_angle,V_angle;

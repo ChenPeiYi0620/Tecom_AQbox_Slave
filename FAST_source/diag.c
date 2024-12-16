@@ -45,9 +45,16 @@ _iq  angle_est(_iq tan_a, _iq tan_b, _iq cFangle){
 
 void average(_iq *curr_avg, _iq *last_avg, _iq newVar,Uint16 avg_load,_iq numerator){
     if (avg_load==0)
-    {*curr_avg=*curr_avg+ newVar/numerator;}///(float)count_limit
-    else {*last_avg=*curr_avg;
+    {*curr_avg=*curr_avg+ newVar;}///(float)count_limit
+    else {*last_avg=*curr_avg/numerator;
     *curr_avg=_IQ(0);
+    }}
+
+void rms(_iq *curr_rms, _iq *last_rms, _iq newVar,Uint16 avg_load,_iq numerator){
+    if (avg_load==0)
+    {*curr_rms=*curr_rms+ newVar*newVar;}///(float)count_limit
+    else {*last_rms=sqrtf(*curr_rms/numerator);
+    *curr_rms=_IQ(0);
     }}
 
 void DEMAG_Feature(_iq *UD_feature,_iq *LD_feature, IPARK mag_flux,_iq LD_harm, _iq Fangle, _iq comp_phase){

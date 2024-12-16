@@ -167,31 +167,15 @@ void SFF(_iq SFFA, _iq SFFB,_iq SFFC, _iq *SFF_in, _iq *SSF_out){
     *(SFF_in+2)= *(SFF_in+1);*(SFF_in+1)= *(SFF_in);
     *(SSF_out+2)= *(SSF_out+1);*(SSF_out+1)= *(SSF_out);
 }
-//void SFF_FAST(_iq wtr_theta,_iq *SFF_in, _iq *SFF_out, _iq epsilon, _iq T){
-//    _iq e1out,e2out;
-//    // use SFF_in[0] to store raw input
-//    // use SFF_in[1] to store e1_in
-//    // use SFF_out[0] to store u_out
-//    // use SFF_out[1] to store e2_in
-//    *(SFF_in+1)=(*SFF_in-*SFF_out)*epsilon*_IQsin(wtr_theta);//e1
-//    *(SFF_out+1)=(*SFF_in-*SFF_out)*epsilon*_IQcos(wtr_theta);//e1
-//    // calculate uout
-//    e1out=T*(*(SFF_in+2))+*(SFF_in+3);
-//    e2out=T*(*(SFF_out+2))+*(SFF_out+3);
-//    // e1_out=(Tsz^-1/1-z^-1)e1_out
-//    // u_out= e1_out*sin(wrt)+e2_out*cos(wrt)
-//    *SFF_out=e1out*_IQsin(wtr_theta)+e2out*_IQcos(wtr_theta);
-//    // Update data
-//    // use SFF_in[2] to store e1_last
-//    // use SFF_in[3] to store e1_out_last
-//    *(SFF_in+2)=*(SFF_in+1);
-//    *(SFF_in+3)=e1out;
-//    // use SFF_out[2] to store e2_last
-//    // use SFF_out[3] to store e2_out_last
-//    *(SFF_out+2)=*(SFF_out+1);
-//    *(SFF_out+3)=e2out;
-//
-//}
+
+void voltage_filtering(float last_v, float *current_v, float filter_thres){
+    float temp_curr_vol=*current_v;
+    *current_v= fabs(temp_curr_vol-last_v)>filter_thres ? last_v : temp_curr_vol;
+}
+
+
+
+
 
 
 

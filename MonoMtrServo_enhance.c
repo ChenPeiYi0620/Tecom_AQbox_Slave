@@ -1554,6 +1554,11 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             trig2 = 0;
     }
 
+    // voltage filtering
+    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
+    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
+
+
     // Adjust phase voltage direction based on inversion state
     phase_volt1_dir=phase_volt1_dir*inv1;
     phase_volt2_dir=phase_volt2_dir*inv2;
@@ -1599,11 +1604,6 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         I_A=_IQmpy(motor->clarke.Alpha,CURRENT);
         I_B=_IQmpy(motor->clarke.Beta,CURRENT);
 
-        Emf_A = V_A - _IQmpy(I_A,Flux_Rs);//Rs_est
-        Emf_B = V_B - _IQmpy(I_B,Flux_Rs);//Rs_est
-
-        Emf_mag=_IQmag(Emf_A,Emf_B);
-
         // [1/s]*[s/(s+wc)]
         // calculate system speed and corner freq wc
         //---------------------------------------------------------------------------------
@@ -1624,7 +1624,7 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         EMFtoLPF(Tsim,fast_wc,&EMF1);
 
         //-----------------------------------------------------------------------------------
-        // [(s+wc)/s] compensation
+        // [(s+wc)/s] compensation parameters
         //-----------------------------------------------------------------------------------
 
         Flux_comp(we,fast_wc,&mag_comp2,&phase_comp);
@@ -1685,14 +1685,6 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         SFF(SFFA,SFFB,SFFC,Flux_A_est_active,Flux_A_est_active_SFF);
         SFF(SFFA,SFFB,SFFC,Flux_B_est_active,Flux_B_est_active_SFF);
 
-        //   SFF_FAST( V_angle,Flux_A_est_active,Flux_A_est_active_SFF,epsilon, motor1.T);
-        //   SFF_FAST( V_angle,Flux_B_est_active,Flux_B_est_active_SFF,epsilon, motor1.T);
-        //    if(Rs_est<_IQ(20))
-        //  if(estimate_c == 1){
-        //      F_angle = _IQdiv(_IQatan2(Flux_B_est_active,Flux_A_est_active),two_PI)+cFangle;
-        //  }
-        //  else {
-        ////        counttime--;
         if (SFF_en==0)
             F_angle = _IQdiv(_IQatan2(Flux_B_est_active[0],Flux_A_est_active[0]),two_PI)+cFangle;
         else   F_angle =_IQdiv(_IQatan2(Flux_B_est_active_SFF[0],Flux_A_est_active_SFF[0]),two_PI)+cFangle;
@@ -1784,6 +1776,13 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         // combined model
         Torque_DB = 1000*_IQmpy(_IQmpy(_IQ(1.5),POLE_PAIRS),(_IQmpy(Lamda_df,I_B)-_IQmpy(Lamda_qf,I_A)))-_IQmpy(_IQ(B_damp),we_mech);
 
+        // power estimate
+//        Power1=(Vabc.Alpha*motor1.clarke.Alpha+Vabc.Beta*motor1.clarke.Beta)*Vdc*CURRENT;
+
+        Power1=2*(V_A*I_A+V_B*I_B)+V_A*I_B+V_B*I_A;
+
+
+
         //-------------------------------------------------------------------------------
         //  averaging section
         //-------------------------------------------------------------------------------
@@ -1801,6 +1800,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         average(&flux_energy, &flux_energy_last,_IQmag(mag_flux.Alpha,mag_flux.Beta), avg_load1,avg_limit1);
         average(&avg_test, &avg_test_last,UD_mag, avg_load1,avg_limit1);
         average(&avg_temp, &avg_temp_last,systemp, avg_load1,avg_limit1);// average the measured temperature
+        average(&Power1_avg, &Power1_avg_last,Power1, avg_load1,avg_limit1);
+        rms(&rms_test, &rms_last,phase_volt1*Vdc,avg_load1,avg_limit1);
 
         if (cur_offset_complete==0){
             average(&offsetA_sum, &offsetA_avg,motor1.currentAs, avg_load1,avg_limit1);
@@ -2114,9 +2115,9 @@ interrupt void scibRxFifoIsr(void)
             //circular buffer for FAST data  。
             cb_index=head1 +sci_count*2;
             cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
-            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(0.6*32768)+32767;                   //Speed_F.Speed, pu
-            FAST_data[1]=data_transmit_test ? update_FAST_en : (Uint16)(1*32768)+32767;  //Torq_est, pu
-            FAST_data[2]=data_transmit_test ? sci_count  : (Uint16)(0.7*32768)+32767;              //Power W, PU
+            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(Speed_F.Speed*32768)+32767;                   //Speed_F.Speed, pu
+            FAST_data[1]=data_transmit_test ? update_FAST_en : (Uint16)(Torq_est_avg/1000*32768)+32767;                      //Torq_est, pu
+            FAST_data[2]=data_transmit_test ? sci_count  : (Uint16)(Power1_avg_last/1000*32768)+32767;              //Power W, PU
             FAST_data[3]=data_transmit_test ? cb_index  : cb_index;                             //Idle
             send_data_package( device_number, FAST_data[0],FAST_data[1],FAST_data[2],FAST_data[3]);
             sci_count++;

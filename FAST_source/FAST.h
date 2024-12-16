@@ -78,6 +78,7 @@ Default initalizer for the PARK object.
 float lastPWM_duty(float *ref1_cap2_last, float *ref1_cap4_last, float CAP2,
                    float CAP4);
 void LinetoPhase(_iq Line_A, _iq Line_B, CLARKE *phase_volt);
+
 void EMFtoLPF(float samplingTime, float LPF_radius, EMF *EMF);
 void Flux_comp(_iq omega_e, _iq LPF_radius, _iq *mag_comp, _iq *phase_comp);
 void Flux_CurModel(_iq Ld, _iq Lq, _iq Lamda_m, _iq idr, _iq iqr,
@@ -93,6 +94,7 @@ void Vpol_calib_origin(_iq ref, _iq *phase, _iq wehz, _iq capturecount1,
 void inverse(_iq *input);
 void SFF(_iq SFFA, _iq SFFB, _iq SFFC, _iq *SFF_in, _iq *SSF_out);
 void SFF_FAST(_iq wtr_theta, _iq *SFF_in, _iq *SFF_out, _iq epsilon, _iq T);
+void voltage_filtering(float last_v, float *current_v, float filter_thres);
 
 
 #endif
