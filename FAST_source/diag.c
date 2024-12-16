@@ -7,6 +7,52 @@
 
 #include "diag.h"
 
+#define deg60 PI/3 // for winding fault diagnosis
+
+// demagnetization parametric
+Uint16 avg_counter,avg_limit=10000;
+float fs_demag_avg_A,fs_demag_avg_B,local_demag_avg_A,local_demag_avg_B;
+float local_demag_avg_last_A,local_demag_avg_last_B,fs_demag_avg_last_A,fs_demag_avg_last_B;
+float lumda_h=0.00577,lumda_offset=0.0000362;
+float local_demag,fs_demag,HI_LD,HI_UD;
+float scale1=1;//50
+float scale=5;
+Uint16 UD_flag,LD_flag;
+float omega_r,omega_r_last,omega_r2_last;
+int CountT = 20;
+// parameters for demag diagnosis
+float LD_magcomp,LD_phase_comp,LD_harm=-2;
+float UD_feature[2],LD_feature[2],UD_feature_avg[2],LD_feature_avg[2],UD_feature_avg_last[2],LD_feature_avg_last[2],HI_demag[4];
+float flux_energy,flux_energy_last;
+Uint16 avg_count1,avg_limit1=10000,avg_load1;
+float avg_test,avg_test_last,rms_test,rms_last;
+float UD_mag,LD_mag;
+IPARK mag_flux;
+float F_angle,V_angle;
+
+// winding fault parameters
+//----------------------------------------------
+PARK flux_cn,park_cn;
+float fluxDs_cn_lpf = 0;   // fault signal only pass low pass filter
+float fluxQs_cn_lpf = 0;
+float parkDs_cn_lpf = 0;   // fault signal only pass low pass filter
+float parkQs_cn_lpf = 0;
+float wc=1, wc1 = 0.01, wc2 = 0.01;   //low pass filter frequency parameter
+float k=1 , k1 = 1 , k2 = 1;          //low pass filter gain
+float fluxDs_cn_sum = 0;  // fault signal summation from phase current
+float fluxQs_cn_sum = 0;
+float fluxDs_cn_avg = 0;  // fault signal average form phase current
+float fluxQs_cn_avg = 0;
+float fluxdq_cn_avg = _IQ(0),fluxdq_cn_sum = _IQ(0);
+float parkDs_cn_sum = 0;  // fault signal summation from phase current
+float parkQs_cn_sum = 0;
+float parkDs_cn_avg = 0;  // fault signal average form phase current
+float parkQs_cn_avg = 0;
+float parkdq_cn_avg = _IQ(0),parkdq_cn_sum = _IQ(0);
+float avg_count_cn = 0,avg_limit_cn=10000,avg_load1_cn=0;
+float cn_err_code=0, cn_valve=0.05, current_mag_avg=0,current_mag_sum=0;
+
+
 void LD_2nd_comp(_iq omega_e, _iq LPF_radius, _iq *mag_comp,_iq *phase_comp,_iq LD_harm)
 {
     if(_IQabs(omega_e)<_IQ(1)) *mag_comp = _IQ(1);
@@ -89,4 +135,17 @@ void HI_DEMAG(_iq *HI_Demag, _iq lumda_h, _iq UDmag , _iq LDmag, _iq noise){
     if (*(HI_Demag+2) <=0.03) *(HI_Demag+3)=0;
     else *(HI_Demag+3)=1;
 }
-
+void CN_Fault(_iq *cn_err_code, _iq cn_valve, _iq current_mag, _iq cn_D,_iq cn_Q,_iq cn_mag ){
+    if (cn_mag/current_mag < cn_valve){
+        // if cn_mag is small, no short fault alarm
+        cn_err_code=0;  }
+    else {
+    float  neg_freq_phase=_IQatan2(cn_Q,cn_D);
+        if (fabs(neg_freq_phase)<deg60)
+            *cn_err_code=1;//phase A fault if phase between -60 to 60 deg
+        else if (neg_freq_phase>deg60)
+            *cn_err_code=3;//phase C fault if phase between 60 to 180 deg
+        else
+            *cn_err_code=2;//phase B fault if phase between 180 to -60 deg
+    }
+}

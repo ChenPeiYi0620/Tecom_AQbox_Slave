@@ -12,6 +12,7 @@
 #include "../motorVars.h"
 #include "../Emif_asram.h"
 
+
 typedef union {
     float f;
     struct
@@ -36,9 +37,29 @@ typedef union {
     } raw;
 } myuint;
 
+
+//----------------------------------------------
+// SCI paras
+//----------------------------------------------
+
 extern Uint16 first_and_last_data_block[8]; //first and last data package of rs485
 extern Uint16 FAST_data[4]; //Fast data for transmission (only used for version1 with EMIF wrong Layout)
 extern int cb_index; // pointer for circular buffer transmission
+
+extern unsigned int test_ftoint;
+extern myfloat myfloat_test;
+extern myuint myuint_test;
+extern int send_en,FAST_enable,send_delay;
+extern Uint16 send_datalength;
+extern Uint32 sci_count,overtime_count,send_count;
+extern Uint16 ReceivedChar[16],ReceivedChar2,device_number;
+extern Uint16 crc1,crc2;
+extern float temp_test;
+extern Uint16 temp_data1,temp_data2;
+extern Uint16 update_FAST_en;
+extern Uint16 data_transmit_test;
+extern Uint16 Rs_U16,Ls_U16,H_8bits,L_8bits ;
+extern Uint16 test_count,cmd_rcv_time;
 
 void InitsciGpio(void);
 void scia_loopback_init(void);

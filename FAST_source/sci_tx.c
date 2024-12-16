@@ -7,9 +7,27 @@
 
 #include "sci_tx.h"
 
+//----------------------------------------------
+// SCI paras
+//----------------------------------------------
 Uint16 first_and_last_data_block[8]; //first and last data package of rs485
 Uint16 FAST_data[4]; //Fast data for transmission (only used for version1 with EMIF wrong Layout)
 int cb_index; // pointer for circular buffer transmission
+
+unsigned int test_ftoint;
+myfloat myfloat_test;
+myuint myuint_test;
+int send_en=0,FAST_enable=1,send_delay=-1;
+Uint16 send_datalength=2000;
+Uint32 sci_count,overtime_count,send_count;
+Uint16 ReceivedChar[16],ReceivedChar2=0,device_number=100;
+Uint16 crc1,crc2;
+float temp_test;
+Uint16 temp_data1,temp_data2;
+Uint16 update_FAST_en=1;
+Uint16 data_transmit_test=0;
+Uint16 Rs_U16,Ls_U16,H_8bits,L_8bits ;
+Uint16 test_count,cmd_rcv_time;
 
 void InitsciGpio(void)
 {

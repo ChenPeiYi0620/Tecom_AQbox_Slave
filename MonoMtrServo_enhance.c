@@ -101,10 +101,10 @@ interrupt void scibRxFifoIsr(void);
 // ------------------------------
 #if BUILDLEVEL  != LEVEL1
 inline void motorCurrentSense(void);
-inline void motorVACSense(float *Va,float *Vb,float *Vc );
-inline void motorACCSense(float *acc);
-inline void motorACCSense(float *temp);
-inline void set_communication_mode(Uint16 communication_mode_active);
+//inline void motorVACSense(float *Va,float *Vb,float *Vc );
+//inline void motorACCSense(float *acc);
+//inline void motorACCSense(float *temp);
+//inline void set_communication_mode(Uint16 communication_mode_active);
 inline void send_data_package(Uint16 device_num, Uint16 data1,Uint16 data2,Uint16 data3,Uint16 data4);
 inline void posEncoder(MOTOR_VARS * motor);
 #endif
@@ -295,24 +295,24 @@ inline void motorCurrentSense()
     return;
 }
 
-inline void motorVACSense(float *Va,float *Vb,float *Vc )
-{
-    *Va = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    *Va = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-        return;
-}
-
-inline void motorACCSense(float *acc)
-{
-    *acc = (float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    return;
-}
-inline void motortempSense(float *acc)
-{
-    *acc = (float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    return;
-}
+//inline void motorVACSense(float *Va,float *Vb,float *Vc )
+//{
+//    *Va = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+//    *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+//    *Va = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+//        return;
+//}
+//
+//inline void motorACCSense(float *acc)
+//{
+//    *acc = (float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+//    return;
+//}
+//inline void motortempSense(float *acc)
+//{
+//    *acc = (float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+//    return;
+//}
 
 
 
@@ -1822,6 +1822,34 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         average(&Torq_est_cur_mtwo_sum, &Torq_est_cur_mtwo_avg, Torq_est_cur_mtwo,avg_load2,torq_count);
         average(&Torque_DB_sum, &Torque_DB_avg, Torque_DB,avg_load2,torq_count);
 
+        //---------------------------------------------------------------------------------
+        // winding fault detection
+        //---------------------------------------------------------------------------------
+         // winding fault detection by current harmonic
+         park_cn.Alpha  = motor->clarke.Alpha;
+         park_cn.Beta   = motor->clarke.Beta;
+         //translation by -theta_e
+         park_cn.Angle  = -F_angle;
+         park_cn.Sine   = __sinpuf32(park_cn.Angle);
+         park_cn.Cosine = __cospuf32(park_cn.Angle);
+         PARK_MACRO(park_cn)
+         // avg counter for cn detection
+         if (avg_count_cn<avg_limit_cn){avg_count_cn+=1;
+         avg_load1_cn=0;}
+         else {avg_load1_cn=1;
+         avg_count1=0;}
+         // -1 harmonic projecting in x-axis
+         average(&parkDs_cn_sum, &parkDs_cn_avg, park_cn.Ds,avg_load1_cn,avg_limit_cn);
+         // -1 harmonic projecting in y-axis
+         average(&parkQs_cn_sum, &parkQs_cn_avg, park_cn.Qs,avg_load1_cn,avg_limit_cn);
+         // -1 harmonic magnitude
+         average(&parkdq_cn_sum, &parkdq_cn_avg, _IQmag(park_cn.Ds,park_cn.Qs),avg_load1_cn,avg_limit_cn);
+
+
+         // calculating current magnitude
+         average(&current_mag_sum, &current_mag_avg, _IQmag(park_cn.Alpha,park_cn.Beta),avg_load1_cn,avg_limit_cn);
+         // cn fault diagnosis
+         CN_Fault(&cn_err_code, cn_valve, current_mag_avg, parkDs_cn_avg, parkQs_cn_avg, parkdq_cn_avg );
 
         //-------------------------------------------------------------------------------
         //  data updating and transmission
@@ -2239,14 +2267,14 @@ inline void send_data_package(Uint16 device_num, Uint16 data1,Uint16 data2,Uint1
     GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
 }
 
-inline void set_communication_mode(Uint16 communication_mode_active){
-    EALLOW;
-    if (communication_mode_active)
-        PieCtrlRegs.PIEIER1.bit.INTx2=0;// Stop ADC sampling
-    else
-        PieCtrlRegs.PIEIER1.bit.INTx2=1;// Start ADC sampling
-    EDIS;
-}
+//inline void set_communication_mode(Uint16 communication_mode_active){
+//    EALLOW;
+//    if (communication_mode_active)
+//        PieCtrlRegs.PIEIER1.bit.INTx2=0;// Stop ADC sampling
+//    else
+//        PieCtrlRegs.PIEIER1.bit.INTx2=1;// Start ADC sampling
+//    EDIS;
+//}
 
 /****************************************************************************
  * End of Code *
