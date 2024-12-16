@@ -135,6 +135,7 @@ void HI_DEMAG(_iq *HI_Demag, _iq lumda_h, _iq UDmag , _iq LDmag, _iq noise){
     if (*(HI_Demag+2) <=0.03) *(HI_Demag+3)=0;
     else *(HI_Demag+3)=1;
 }
+
 void CN_Fault(_iq *cn_err_code, _iq cn_valve, _iq current_mag, _iq cn_D,_iq cn_Q,_iq cn_mag ){
     if (cn_mag/current_mag < cn_valve){
         // if cn_mag is small, no short fault alarm
