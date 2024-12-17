@@ -135,6 +135,7 @@ extern float aT2_1,bT2_1,cT2_1,dT2_1;
 extern float adbcT2;
 extern float qT2_11,qT2_12,qT2_21,qT2_22;
 extern float aT2_2,bT2_2,cT2_2,dT2_2;
+extern myfloat myf_Rs, myf_Ls;
 
 
 

@@ -19,7 +19,7 @@ float ref1_cap2_last,ref1_cap4_last,ref2_cap2_last,ref2_cap4_last,ref3_cap2_last
 float phase1_cap2_last,phase1_cap4_last,phase2_cap2_last,phase2_cap4_last,phase3_cap2_last,phase3_cap4_last;
 float ref_theta;
 float inv1,inv2,inv3,inv1_past,inv2_past,inv3_past;
-float vol_filter_thres=0.01;
+float vol_filter_thres=0.5;
 
 //V pole clib parameters
 //Vpol_feature(V1_feature,ref_elms1,ref_volt1,ref_volt1_last,corr_count, corr_count_limit);

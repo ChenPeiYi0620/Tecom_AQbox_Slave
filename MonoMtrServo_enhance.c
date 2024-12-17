@@ -1675,8 +1675,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             Flux_B_est_active[0] = -motor1.clarke.Alpha;
         }
         else {
-            Flux_A_est_active[0] = Emf_ab_lpf2.Alpha - _IQmpy(Lq,(I_A));
-            Flux_B_est_active[0] = Emf_ab_lpf2.Beta - _IQmpy(Lq,(I_B));
+            Flux_A_est_active[0] = Emf_ab_lpf2.Alpha - _IQmpy(Ls,(I_A));
+            Flux_B_est_active[0] = Emf_ab_lpf2.Beta - _IQmpy(Ls,(I_B));
         }
 
         //    SFFA= (2/T)^2, SFFB=epsilon*2/T, SFFC=w0^2
@@ -1834,17 +1834,17 @@ inline void BuildLevel2(MOTOR_VARS * motor)
          park_cn.Cosine = __cospuf32(park_cn.Angle);
          PARK_MACRO(park_cn)
          // avg counter for cn detection
+
          if (avg_count_cn<avg_limit_cn){avg_count_cn+=1;
          avg_load1_cn=0;}
          else {avg_load1_cn=1;
-         avg_count1=0;}
+         avg_count_cn=0;}
          // -1 harmonic projecting in x-axis
          average(&parkDs_cn_sum, &parkDs_cn_avg, park_cn.Ds,avg_load1_cn,avg_limit_cn);
          // -1 harmonic projecting in y-axis
          average(&parkQs_cn_sum, &parkQs_cn_avg, park_cn.Qs,avg_load1_cn,avg_limit_cn);
          // -1 harmonic magnitude
-         average(&parkdq_cn_sum, &parkdq_cn_avg, _IQmag(park_cn.Ds,park_cn.Qs),avg_load1_cn,avg_limit_cn);
-
+         parkdq_cn_avg=_IQmag(parkQs_cn_avg,parkDs_cn_avg);
 
          // calculating current magnitude
          average(&current_mag_sum, &current_mag_avg, _IQmag(park_cn.Alpha,park_cn.Beta),avg_load1_cn,avg_limit_cn);
@@ -1999,8 +1999,13 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 8:
-            dacAval = (Uint16) _IQtoQ11(scale * acc_y);
-            dacBval = (Uint16) _IQtoQ11(scale * avg_temp_last);
+            dacAval = (Uint16) _IQtoQ11(scale * park_cn.Alpha+ _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Alpha+ _IQ(1));
+            break;
+
+        case 9:
+            dacAval = (Uint16) _IQtoQ11(scale * park_cn.Qs+ _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * parkQs_cn_avg+ _IQ(1));
             break;
 
         default:
@@ -2193,15 +2198,27 @@ interrupt void scibRxFifoIsr(void)
 
         case 6:// command =6: set the motor parameters
             // get the motor parameters from master
-            POLE_PAIRS=(float)ReceivedChar[7]/2;
-            H_8bits = ReceivedChar[3] & 0xFF;
-            L_8bits = ReceivedChar[4] & 0xFF;
-            Rs_U16 = ((Uint16)H_8bits << 8) | L_8bits;
-            H_8bits = ReceivedChar[5] & 0xFF;
-            L_8bits = ReceivedChar[6] & 0xFF;
-            Ls_U16 = ((Uint16)H_8bits << 8) | L_8bits;;
-            Flux_Rs=(float)Rs_U16/65535*20;
-            Ls=(float)Ls_U16/65535;
+            myf_Rs.raw.last  = ReceivedChar[3];
+            myf_Rs.raw.third  = ReceivedChar[4];
+            myf_Rs.raw.second = ReceivedChar[5];
+            myf_Rs.raw.first  = ReceivedChar[6];
+            myf_Ls.raw.last   = ReceivedChar[7];
+            myf_Ls.raw.third  = ReceivedChar[8];
+            myf_Ls.raw.second = ReceivedChar[9];
+            myf_Ls.raw.first  = ReceivedChar[10];
+            POLE_PAIRS=ReceivedChar[11]/2;
+            Flux_Rs=myf_Rs.f;
+            Ls=myf_Ls.f;
+
+//            POLE_PAIRS=ReceivedChar[7]/2;
+//            H_8bits = ReceivedChar[3] & 0xFF;
+//            L_8bits = ReceivedChar[4] & 0xFF;
+//            Rs_U16 = ((Uint16)H_8bits << 8) | L_8bits;
+//            H_8bits = ReceivedChar[5] & 0xFF;
+//            L_8bits = ReceivedChar[6] & 0xFF;
+//            Ls_U16 = ((Uint16)H_8bits << 8) | L_8bits;;
+//            Flux_Rs=(float)Rs_U16/65535*20;
+//            Ls=(float)Ls_U16/65535;
             // enable fast update
             update_FAST_en=1;
             sci_count=0;
@@ -2210,7 +2227,7 @@ interrupt void scibRxFifoIsr(void)
             scib_xmit(2);                               // cmd code: from slave
             scib_xmit(device_number);
             int i1=0;
-            for (i1 = 0; i1 < 5; i1++){
+            for (i1 = 0; i1 < 9; i1++){
                 scib_xmit(ReceivedChar[i1+3]);
             }
             while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
@@ -2224,9 +2241,9 @@ interrupt void scibRxFifoIsr(void)
             //circular buffer for FAST data  。
             cb_index=head1 +sci_count*2;
             cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
-            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(0.0001*32768)+32768;   //Icn_x
-            FAST_data[1]=data_transmit_test ? 7788 :  (Uint16)(0.00015*32768)+32768;  //Icn_y
-            FAST_data[2]=data_transmit_test ? sci_count  : (Uint16)(0.0005*32768)+32768;                 //_rms
+            FAST_data[0]=data_transmit_test ? 5566 :  (Uint16)(parkDs_cn_avg*32768)+32768;   //Icn_x
+            FAST_data[1]=data_transmit_test ? 7788 :  (Uint16)(parkQs_cn_avg*32768)+32768;  //Icn_y
+            FAST_data[2]=data_transmit_test ? sci_count  : (Uint16)(current_mag_avg*32768)+32768;                 //_rms
             FAST_data[3]=data_transmit_test ? cb_index  : cb_index;                   //Idle
             send_data_package( device_number, FAST_data[0],FAST_data[1],FAST_data[2],FAST_data[3]);
             break;

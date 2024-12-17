@@ -139,7 +139,7 @@ void HI_DEMAG(_iq *HI_Demag, _iq lumda_h, _iq UDmag , _iq LDmag, _iq noise){
 void CN_Fault(_iq *cn_err_code, _iq cn_valve, _iq current_mag, _iq cn_D,_iq cn_Q,_iq cn_mag ){
     if (cn_mag/current_mag < cn_valve){
         // if cn_mag is small, no short fault alarm
-        cn_err_code=0;  }
+        *cn_err_code=0;  }
     else {
     float  neg_freq_phase=_IQatan2(cn_Q,cn_D);
         if (fabs(neg_freq_phase)<deg60)

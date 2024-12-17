@@ -126,6 +126,7 @@ float adbcT2;
 float qT2_11,qT2_12,qT2_21,qT2_22;
 float aT2_2,bT2_2,cT2_2,dT2_2;
 
+myfloat myf_Rs, myf_Ls;
 
 
 
