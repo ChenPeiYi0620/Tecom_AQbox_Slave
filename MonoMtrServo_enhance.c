@@ -101,7 +101,7 @@ interrupt void scibRxFifoIsr(void);
 // ------------------------------
 #if BUILDLEVEL  != LEVEL1
 inline void motorCurrentSense(void);
-//inline void motorVACSense(float *Va,float *Vb,float *Vc );
+inline void motorVACSense(float *Va,float *Vb,float *Vc );
 //inline void motorACCSense(float *acc);
 //inline void motorACCSense(float *temp);
 //inline void set_communication_mode(Uint16 communication_mode_active);
@@ -295,13 +295,14 @@ inline void motorCurrentSense()
     return;
 }
 
-//inline void motorVACSense(float *Va,float *Vb,float *Vc )
-//{
-//    *Va = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-//    *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-//    *Va = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-//        return;
-//}
+inline void motorVACSense(float *Va,float *Vb,float *Vc )
+{
+    *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetA; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+    *Vb = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetB; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+    *Vc = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetC; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+        return;
+}
+
 //
 //inline void motorACCSense(float *acc)
 //{
@@ -721,13 +722,13 @@ void main(void){
     //  AdcaRegs.ADCPPB3CONFIG.bit.CONFIG = 2;                     // PPB is associated with SOC2
     //  AdcaRegs.ADCPPB3OFFCAL.bit.OFFCAL = 0;                     // Write zero to this for now till offset ISR is run
     //
-      // Motor 1: Va  @ B1
+      // Motor 1: Vb  @ B1
       // ********************************
       AdccRegs.ADCSOC4CTL.bit.CHSEL     =  4;                    // SOC4 will convert pin C4
       AdccRegs.ADCSOC4CTL.bit.ACQPS     = 30;                    // sample window in SYSCLK cycles
       AdccRegs.ADCSOC4CTL.bit.TRIGSEL   = ADCTRIG11_EPWM4SOCA;   // trigger on ePWM2 SOCA/C
 
-      // Motor 1: Vb  @ B4
+      // Motor 1: Va  @ B4
       // ********************************
       AdcaRegs.ADCSOC4CTL.bit.CHSEL     =  4;                    // SOC3 will convert pin A4
       AdcaRegs.ADCSOC4CTL.bit.ACQPS     = 30;                    // sample window in SYSCLK cycles
@@ -1480,8 +1481,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         motor->clarke.Bs = current_lpf_BW*Current_lpf.Beta_LPF;
     }
     else {
-        motor->clarke.As = Last_current_As-offsetA_avg;//_IQmpy(motor->currentAs,_IQ(1)); // Phase A curr.
-        motor->clarke.Bs = Last_current_Bs-offsetB_avg;//_IQmpy(motor->currentBs,_IQ(1)); // Phase B curr.
+        motor->clarke.As = Last_current_As;//_IQmpy(motor->currentAs,_IQ(1)); // Phase A curr.
+        motor->clarke.Bs = Last_current_Bs;//_IQmpy(motor->currentBs,_IQ(1)); // Phase B curr.
     }
     CLARKE_MACRO(motor->clarke)
 
@@ -1565,7 +1566,17 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     phase_volt1=phase_volt1*inv1; //V_ab
     phase_volt2=phase_volt2*inv2; //V_bc
 
-    LinetoPhase(phase_volt1,phase_volt2,&Vabc);
+    // check the input voltage mode
+    if (VAC_measure_mode){
+        Vabc.As=Va;
+        Vabc.Bs=Vb;
+        Vabc.Cs=Vc;
+    }
+    else {
+        LinetoPhase(phase_volt1,phase_volt2,&Vabc);
+    }
+
+    // abc to Alpha Beta
     CLARKE_MACRO(Vabc);
 
 
@@ -1598,8 +1609,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
         // V-IR=EMF
         //---------------------------------------------------------------------------------
-        V_A=_IQmpy(Vabc.Alpha,Vdc);
-        V_B=_IQmpy(Vabc.Beta,Vdc);
+        V_A=VAC_measure_mode? _IQmpy(Vabc.Alpha,Vac_gain) : _IQmpy(Vabc.Alpha,Vdc);
+        V_B=VAC_measure_mode? _IQmpy(Vabc.Beta,Vac_gain) :_IQmpy(Vabc.Beta,Vdc);
 
         I_A=_IQmpy(motor->clarke.Alpha,CURRENT);
         I_B=_IQmpy(motor->clarke.Beta,CURRENT);
@@ -1801,7 +1812,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         average(&avg_test, &avg_test_last,UD_mag, avg_load1,avg_limit1);
         average(&avg_temp, &avg_temp_last,systemp, avg_load1,avg_limit1);// average the measured temperature
         average(&Power1_avg, &Power1_avg_last,Power1, avg_load1,avg_limit1);
-        rms(&rms_test, &rms_last,phase_volt1*Vdc,avg_load1,avg_limit1);
+//        rms(&rms_test, &rms_last,phase_volt1*Vdc,avg_load1,avg_limit1);
+        rms(&rms_test, &rms_last,motor1.clarke.Alpha ,avg_load1,avg_limit1);
 
         if (cur_offset_complete==0){
             average(&offsetA_sum, &offsetA_avg,motor1.currentAs, avg_load1,avg_limit1);
@@ -1863,10 +1875,10 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         temp_data1= (Uint16) (_IQcosPU(temp_test)*32768+32768);
         temp_data2= (Uint16) (_IQsinPU(temp_test)*32768+32768);
         // data buffer 1-4 for RUL
-        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Vabc.Alpha*32768+32768) );
-        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vabc.Beta*32768+32768));
-        updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha*32768+32768));
-        updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta*32768+32768));
+        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Vabc.Alpha*32768+32767) );
+        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vabc.Beta*32768+32767));
+        updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha *32768+32767));
+        updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta *32768+32767));
         //data buffer 5-6 for FAST
         updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, (Uint16)(mag_flux.Alpha*32768+32767));
         updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, (Uint16)(mag_flux.Beta*32768+32767));
@@ -1964,8 +1976,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
     switch (dac_out) {
         case 1:
-            dacAval = (Uint16) _IQtoQ11(scale * motor1.currentAs + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(scale * motor1.currentBs + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.Alpha + 1);
+            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Beta + 1);
             break;
 
         case 2:
@@ -1974,8 +1986,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 3:
-            dacAval = (Uint16) _IQtoQ11(ref_volt1_dir + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(phase_volt1 + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(Vabc.Alpha + _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(motor->clarke.Alpha + _IQ(1));
             break;
 
         case 4:
@@ -2006,6 +2018,11 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         case 9:
             dacAval = (Uint16) _IQtoQ11(scale * park_cn.Qs+ _IQ(1));
             dacBval = (Uint16) _IQtoQ11(scale * parkQs_cn_avg+ _IQ(1));
+            break;
+
+        case 10:
+            dacAval = (Uint16) _IQtoQ11(scale * Vabc.Bs+ _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * Vabc.Cs+ _IQ(1));
             break;
 
         default:
@@ -2052,7 +2069,7 @@ interrupt void MotorControlISR(void)
     //  Measure phase currents and obtain position encoder (QEP) feedback
     // ------------------------------------------------------------------------------
     motorCurrentSense();    //  Measure normalized phase currents (-1,+1)
-//    motorVACSense(&Va,&Vb,&Vc);        //  Measure normalized phase voltages (-1,+1)
+    motorVACSense(&Va,&Vb,&Vc);        //  Measure normalized phase voltages (-1,+1)
     posEncoder(&motor1);    //  Motor 1 Position encoder
 //    acc_y=(float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR;
 //    systemp=(float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR*3.3/0.01;
@@ -2134,6 +2151,7 @@ interrupt void scibRxFifoIsr(void)
 
         case 1: //device status check
             GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            VAC_measure_mode= ReceivedChar[4]==1 ? 1:0;  // if 0 : PWM mode, if 1 : VAC mode
             scib_xmit(2);                               // from slave
             scib_xmit(device_number);                   // device number to avoid conflict
             scib_xmit(~(device_number & 0xFFFF));       // slave response code
@@ -2206,19 +2224,16 @@ interrupt void scibRxFifoIsr(void)
             myf_Ls.raw.third  = ReceivedChar[8];
             myf_Ls.raw.second = ReceivedChar[9];
             myf_Ls.raw.first  = ReceivedChar[10];
+            myf_Ct_gain.raw.last   = ReceivedChar[11];
+            myf_Ct_gain.raw.third  = ReceivedChar[12];
+            myf_Ct_gain.raw.second = ReceivedChar[13];
+            myf_Ct_gain.raw.first  = ReceivedChar[14];
+
             POLE_PAIRS=ReceivedChar[11]/2;
             Flux_Rs=myf_Rs.f;
             Ls=myf_Ls.f;
+            CURRENT=myf_Ct_gain.f;
 
-//            POLE_PAIRS=ReceivedChar[7]/2;
-//            H_8bits = ReceivedChar[3] & 0xFF;
-//            L_8bits = ReceivedChar[4] & 0xFF;
-//            Rs_U16 = ((Uint16)H_8bits << 8) | L_8bits;
-//            H_8bits = ReceivedChar[5] & 0xFF;
-//            L_8bits = ReceivedChar[6] & 0xFF;
-//            Ls_U16 = ((Uint16)H_8bits << 8) | L_8bits;;
-//            Flux_Rs=(float)Rs_U16/65535*20;
-//            Ls=(float)Ls_U16/65535;
             // enable fast update
             update_FAST_en=1;
             sci_count=0;
@@ -2227,7 +2242,7 @@ interrupt void scibRxFifoIsr(void)
             scib_xmit(2);                               // cmd code: from slave
             scib_xmit(device_number);
             int i1=0;
-            for (i1 = 0; i1 < 9; i1++){
+            for (i1 = 0; i1 < 13; i1++){
                 scib_xmit(ReceivedChar[i1+3]);
             }
             while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
@@ -2247,6 +2262,36 @@ interrupt void scibRxFifoIsr(void)
             FAST_data[3]=data_transmit_test ? cb_index  : cb_index;                   //Idle
             send_data_package( device_number, FAST_data[0],FAST_data[1],FAST_data[2],FAST_data[3]);
             break;
+
+        case 8:// command =6: Calibrate CT when offline
+            // get the motor parameters from master
+            my_Ct_offsetA.raw.last  = ReceivedChar[3];
+            my_Ct_offsetA.raw.third  = ReceivedChar[4];
+            my_Ct_offsetA.raw.second = ReceivedChar[5];
+            my_Ct_offsetA.raw.first  = ReceivedChar[6];
+            my_Ct_offsetB.raw.last   = ReceivedChar[7];
+            my_Ct_offsetB.raw.third  = ReceivedChar[8];
+            my_Ct_offsetB.raw.second = ReceivedChar[9];
+            my_Ct_offsetB.raw.first  = ReceivedChar[10];
+            Cur_OffsetA=Cur_OffsetA+my_Ct_offsetA.f;
+            Cur_OffsetB=Cur_OffsetA+my_Ct_offsetB.f;
+
+            // enable fast update
+            update_FAST_en=1;
+            sci_count=0;
+            // send the eco back
+            GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            scib_xmit(2);                               // cmd code: from slave
+            scib_xmit(device_number);
+            int i2=0;
+            for (i2 = 0; i2 < 8; i2++){
+                scib_xmit(ReceivedChar[i2+3]);
+            }
+            while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+            while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+            GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+            break;
+
 
         default: // for undefine command check
             sci_count=0;

@@ -8,12 +8,17 @@
 #include "FAST_vars.h"
 
 // Current offset
-float Cur_OffsetA =0.600112915;
-float Cur_OffsetB =0.595352173;
+float Cur_OffsetA =0.499694824;  // pre-calibrate offset  single : 0.600112915, differential: 0.711094201
+float Cur_OffsetB =0.501907349;  // pre-calibrate offset  single : 0.600112915, differential: 0.707080066
 float set = 0;
-float offsetA,offsetA_sum,offsetA_avg,offsetB,offsetB_sum,offsetB_avg;
+float offsetA,offsetA_sum,offsetA_avg,offsetB,offsetB_sum,offsetB_avg; // for dynamic offset calibration
 int cur_offset_complete=0;
-float Va,Vb,Vc;
+// voltage measuring
+float Vac_OffsetA =0.360488892;
+float Vac_OffsetB =0.361129761;
+float Vac_OffsetC =0.361129761;
+float Va,Vb,Vc,Vac_gain=1371.864;
+int VAC_measure_mode=1;
 
 // Input Parameters
 //------------------------------------
@@ -22,13 +27,13 @@ float CURRENT = (15.389); //15.389 for TM101-OCS
 float Flux_Rs = (12.1);//0.4
 float Ls = (0.009615);//(0.009615)
 float Lq = (0.0092);//0.0144234
-float Ld = (0.0092);//0.0144234
+float Ld = (0.0092) ;//0.0144234
 float Lamda_m = (0.043);//0.045
 float32 ECAP_FREQ = 200E6;
 float32 PWM_SAMPLING = 10E3;
 float32 ECAP_PU;
 //float32 Tsim = 0.0001;
-float32 Tsim = 0.0001;
+float32 Tsim = 0.001/PWM_FREQUENCY;
 float POLE_PAIRS = (4);
 float cFangle = 0;//;-0.0410000011;
 
@@ -126,7 +131,7 @@ float adbcT2;
 float qT2_11,qT2_12,qT2_21,qT2_22;
 float aT2_2,bT2_2,cT2_2,dT2_2;
 
-myfloat myf_Rs, myf_Ls;
+myfloat myf_Rs, myf_Ls,myf_Ct_gain, my_Ct_offsetA,my_Ct_offsetB;
 
 
 

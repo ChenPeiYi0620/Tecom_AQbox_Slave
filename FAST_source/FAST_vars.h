@@ -21,7 +21,12 @@ extern float Cur_OffsetB ;
 extern float set ;
 extern float offsetA,offsetA_sum,offsetA_avg,offsetB,offsetB_sum,offsetB_avg;
 extern int cur_offset_complete;
-extern float Va,Vb,Vc;
+// voltage measuring
+extern float Vac_OffsetA;
+extern float Vac_OffsetB;
+extern float Vac_OffsetC;
+extern float Va,Vb,Vc,Vac_gain;
+extern int VAC_measure_mode;
 
 // Input Parameters
 //------------------------------------
@@ -135,7 +140,7 @@ extern float aT2_1,bT2_1,cT2_1,dT2_1;
 extern float adbcT2;
 extern float qT2_11,qT2_12,qT2_21,qT2_22;
 extern float aT2_2,bT2_2,cT2_2,dT2_2;
-extern myfloat myf_Rs, myf_Ls;
+extern myfloat myf_Rs, myf_Ls,myf_Ct_gain, my_Ct_offsetA, my_Ct_offsetB;
 
 
 
