@@ -582,7 +582,7 @@ void main(void){
     // shilin servo on GPIO(16)
     GPIO_SetupPinOptions(SV_ON_GPIO, GPIO_OUTPUT, GPIO_PULLUP);
     GPIO_SetupPinMux(SV_ON_GPIO, GPIO_MUX_CPU1, SV_ON_MUX);
-    // servo on
+    // servo off
     GPIO_WritePin(SV_ON_GPIO,1);
 
 
@@ -1569,7 +1569,7 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     // check the input voltage mode
     if (VAC_measure_mode){
         Vabc.As=Va;
-        Vabc.Bs=Vb;
+        Vabc.Bs=-Va-Vc;
         Vabc.Cs=Vc;
     }
     else {
@@ -1875,9 +1875,9 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         temp_data1= (Uint16) (_IQcosPU(temp_test)*32768+32768);
         temp_data2= (Uint16) (_IQsinPU(temp_test)*32768+32768);
         // data buffer 1-4 for RUL
-        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Vabc.Alpha*32768+32767) );
-        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vabc.Beta*32768+32767));
-        updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha *32768+32767));
+        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Va*32768+32767));
+        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vc*32768+32767));
+        updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha*32768+32767));
         updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta *32768+32767));
         //data buffer 5-6 for FAST
         updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, (Uint16)(mag_flux.Alpha*32768+32767));
@@ -1976,8 +1976,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
     switch (dac_out) {
         case 1:
-            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.Alpha + 1);
-            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Beta + 1);
+            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.As + 1);
+            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Bs + 1);
             break;
 
         case 2:
@@ -2068,11 +2068,17 @@ interrupt void MotorControlISR(void)
     // ------------------------------------------------------------------------------
     //  Measure phase currents and obtain position encoder (QEP) feedback
     // ------------------------------------------------------------------------------
-    motorCurrentSense();    //  Measure normalized phase currents (-1,+1)
-    motorVACSense(&Va,&Vb,&Vc);        //  Measure normalized phase voltages (-1,+1)
-    posEncoder(&motor1);    //  Motor 1 Position encoder
-//    acc_y=(float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR;
-//    systemp=(float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR*3.3/0.01;
+    motorCurrentSense();            //  Measure normalized phase currents (-1,+1)
+    motorVACSense(&Va,&Vb,&Vc);     //  Measure normalized phase voltages (-1,+1)
+    posEncoder(&motor1);            //  Motor 1 Position encoder
+    if (time_out_count++>time_out) {// servo off if connection timeout
+        GPIO_WritePin(SV_ON_GPIO,1);
+        time_out_count=0;
+    }
+
+
+    //    acc_y=(float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR;
+    //    systemp=(float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR*3.3/0.01;
     //    motorACCSense(&acc_y);
     //    motortempSense(&systemp);
 
@@ -2146,6 +2152,7 @@ interrupt void scibRxFifoIsr(void)
 
 
     if (cmd_rcv){
+        time_out_count=0; //reset timeout if cmd receive
         int Master_cmd=ReceivedChar[2];
         switch (Master_cmd){
 
@@ -2198,7 +2205,7 @@ interrupt void scibRxFifoIsr(void)
         case 5:// command =5: device data collection stop
             // leave communication mode
             communication_mode_active=0;
-//            set_communication_mode(communication_mode_active);
+            //            set_communication_mode(communication_mode_active);
             update_FAST_en=1; // enable fast update
             sci_count=0;
             cmd_rcv_time=0;
@@ -2274,7 +2281,7 @@ interrupt void scibRxFifoIsr(void)
             my_Ct_offsetB.raw.second = ReceivedChar[9];
             my_Ct_offsetB.raw.first  = ReceivedChar[10];
             Cur_OffsetA=Cur_OffsetA+my_Ct_offsetA.f;
-            Cur_OffsetB=Cur_OffsetA+my_Ct_offsetB.f;
+            Cur_OffsetB=Cur_OffsetB+my_Ct_offsetB.f;
 
             // enable fast update
             update_FAST_en=1;
@@ -2292,7 +2299,57 @@ interrupt void scibRxFifoIsr(void)
             GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
             break;
 
+        case 9:// command =6: Calibrate VAC_measure when offline
+            my_Vac_OffsetA.raw.last  = ReceivedChar[3];
+            my_Vac_OffsetA.raw.third  = ReceivedChar[4];
+            my_Vac_OffsetA.raw.second = ReceivedChar[5];
+            my_Vac_OffsetA.raw.first  = ReceivedChar[6];
+            my_Vac_OffsetB.raw.last   = ReceivedChar[7];
+            my_Vac_OffsetB.raw.third  = ReceivedChar[8];
+            my_Vac_OffsetB.raw.second = ReceivedChar[9];
+            my_Vac_OffsetB.raw.first  = ReceivedChar[10];
+            //            my_Vac_OffsetC.raw.last   = ReceivedChar[11];
+            //            my_Vac_OffsetC.raw.third  = ReceivedChar[12];
+            //            my_Vac_OffsetC.raw.second = ReceivedChar[13];
+            //            my_Vac_OffsetC.raw.first  = ReceivedChar[14];
 
+            Vac_OffsetA=Vac_OffsetA+my_Vac_OffsetA.f;
+            Vac_OffsetB=Vac_OffsetB+my_Vac_OffsetB.f;
+            //            Vac_OffsetC=Vac_OffsetC+my_Vac_OffsetC.f;
+
+            // enable fast update
+            update_FAST_en=1;
+            sci_count=0;
+            // send the eco back
+            GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            scib_xmit(2);                               // cmd code: from slave
+            scib_xmit(device_number);
+            int i3=0;
+            for (i3 = 0; i3 < 8; i3++){
+                scib_xmit(ReceivedChar[i3+3]);
+            }
+            while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+            while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+            GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+            break;
+
+        case 10:// command 10: servo control
+            // check the servo cmd, if 1 servo on otherwise off
+            if (ReceivedChar[3]==1)
+                GPIO_WritePin(SV_ON_GPIO,0);//servo on
+            else
+                GPIO_WritePin(SV_ON_GPIO,1);//servo off
+
+            // device response for master check
+            GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            scib_xmit(2);                               // from slave
+            scib_xmit(device_number);                   // device number to avoid conflict
+            scib_xmit(~(device_number & 0xFFFF));       // slave response code
+            scib_xmit(0);                               // Idle data
+            while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+            while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+            GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+            break;
         default: // for undefine command check
             sci_count=0;
             break;

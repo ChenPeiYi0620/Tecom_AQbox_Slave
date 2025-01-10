@@ -19,7 +19,9 @@ myfloat myfloat_test;
 myuint myuint_test;
 int send_en=0,FAST_enable=1,send_delay=-1;
 Uint16 send_datalength=2000;
-Uint32 sci_count,overtime_count,send_count;
+// timeout the motor servo when disconnected for 10 s
+Uint32 sci_count,send_count,time_out_count;
+Uint32 time_out=200000;
 Uint16 ReceivedChar[16],ReceivedChar2=0,device_number=100;
 Uint16 crc1,crc2;
 float temp_test;

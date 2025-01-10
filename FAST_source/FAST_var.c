@@ -8,6 +8,7 @@
 #include "FAST_vars.h"
 
 // Current offset
+myfloat myf_Rs, myf_Ls,myf_Ct_gain, my_Ct_offsetA,my_Ct_offsetB;
 float Cur_OffsetA =0.499694824;  // pre-calibrate offset  single : 0.600112915, differential: 0.711094201
 float Cur_OffsetB =0.501907349;  // pre-calibrate offset  single : 0.600112915, differential: 0.707080066
 float set = 0;
@@ -19,6 +20,7 @@ float Vac_OffsetB =0.361129761;
 float Vac_OffsetC =0.361129761;
 float Va,Vb,Vc,Vac_gain=1371.864;
 int VAC_measure_mode=1;
+myfloat my_Vac_OffsetA,my_Vac_OffsetB, my_Vac_OffsetC;
 
 // Input Parameters
 //------------------------------------
@@ -131,7 +133,6 @@ float adbcT2;
 float qT2_11,qT2_12,qT2_21,qT2_22;
 float aT2_2,bT2_2,cT2_2,dT2_2;
 
-myfloat myf_Rs, myf_Ls,myf_Ct_gain, my_Ct_offsetA,my_Ct_offsetB;
 
 
 

@@ -27,6 +27,7 @@ extern float Vac_OffsetB;
 extern float Vac_OffsetC;
 extern float Va,Vb,Vc,Vac_gain;
 extern int VAC_measure_mode;
+extern myfloat my_Vac_OffsetA,my_Vac_OffsetB, my_Vac_OffsetC;
 
 // Input Parameters
 //------------------------------------
