@@ -20,8 +20,9 @@ myuint myuint_test;
 int send_en=0,FAST_enable=1,send_delay=-1;
 Uint16 send_datalength=2000;
 // timeout the motor servo when disconnected for 10 s
-Uint32 sci_count,send_count,time_out_count;
-Uint32 time_out=200000;
+Uint32 sci_count,send_count,Master_timeout_count;
+Uint32 Master_timeout=10; // master disconnect timeout limit in second
+Uint32 Master_timeout_prescaler=100, Master_timeout_prescaler_cnt=0; // master disconnect timeout prescaler
 Uint16 ReceivedChar[16],ReceivedChar2=0,device_number=100;
 Uint16 crc1,crc2;
 float temp_test;
@@ -30,6 +31,8 @@ Uint16 update_FAST_en=1;
 Uint16 data_transmit_test=0;
 Uint16 Rs_U16,Ls_U16,H_8bits,L_8bits ;
 Uint16 test_count,cmd_rcv_time;
+int sci_send_test=0;
+Uint16 sci_test_array[5]={5, 5, 5, 5, 5};
 
 void InitsciGpio(void)
 {

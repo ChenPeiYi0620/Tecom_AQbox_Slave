@@ -51,7 +51,7 @@ extern float cFangle ;//;-0.0410000011;
 extern Uint32 last_count,corr_count;
 //Uint32 capturecount1,capturecount2,capturecount3,capturecount4,capturecount5,capturecount6,capturecount7,capturecount8;
 extern float32 capturecountthreshold3,capturecountthreshold4;
-extern float modify1,modify2;
+extern float modify1;
 extern CLARKE Current;
 extern CLARKE fluxClarke;
 extern CLARKE Vabc;

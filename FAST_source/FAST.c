@@ -14,11 +14,13 @@ float ref_volt2,ref_past2,ref_volt2_dir;
 float ref_volt3,ref_past3,ref_volt3_dir;
 float phase_volt1,phase_volt1_past,phase_volt1_dir;
 float phase_volt2,phase_volt2_past,phase_volt2_dir;
-float phase_volt3,phase_volt3_dir;
+float phase_volt3,phase_volt3_past,phase_volt3_dir;
 float ref1_cap2_last,ref1_cap4_last,ref2_cap2_last,ref2_cap4_last,ref3_cap2_last,ref3_cap4_last;
 float phase1_cap2_last,phase1_cap4_last,phase2_cap2_last,phase2_cap4_last,phase3_cap2_last,phase3_cap4_last;
+float PWM_length=20000;
+int integration_mode=1,inv_disable=0; // Capture numerator source
 float ref_theta;
-float inv1,inv2,inv3,inv1_past,inv2_past,inv3_past;
+int16 inv1,inv2,inv3,inv1_past,inv2_past,inv3_past,trig1,trig2,trig3;
 float vol_filter_thres=0.5;
 
 //V pole clib parameters
@@ -28,8 +30,7 @@ Uint16 ref_load,trig1_last;
 float V1_feature[2],ref_elms1[20],V2_feature[2],ref_elms2[10],descend_ratio,coef_d=0.7;
 Uint16 corr_count1,corr_count2,corr_count_limit=10;
 float ref_volt1_last,ref_volt2_last;
-float phase_volt1_last,phase_volt2_last,phase_volt2_las1,phase_volt2_las2,inverse1,inverse2,trig1,trig2,descend_trig1,descend_trig2,in_trig1,in_trig2;
-
+float phase_volt1_last,phase_volt2_last,phase_volt2_las1,phase_volt2_las2,descend_trig1,descend_trig2;
 // function to reduce glitch effect
 //float PWM_deglitch(Uint32 *CAP2, Uint32 *CAP4, Uint32 *last_CAP2, Uint32 *last_CAP4 ){
 //    if *CAP2

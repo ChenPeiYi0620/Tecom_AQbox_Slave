@@ -16,7 +16,7 @@ float local_demag_avg_last_A,local_demag_avg_last_B,fs_demag_avg_last_A,fs_demag
 float lumda_h=0.00577,lumda_offset=0.0000362;
 float local_demag,fs_demag,HI_LD,HI_UD;
 float scale1=1;//50
-float scale=5;
+float scale=0.5;
 Uint16 UD_flag,LD_flag;
 float omega_r,omega_r_last,omega_r2_last;
 int CountT = 20;

@@ -43,7 +43,7 @@ float cFangle = 0;//;-0.0410000011;
 Uint32 last_count,corr_count;
 //Uint32 capturecount1,capturecount2,capturecount3,capturecount4,capturecount5,capturecount6,capturecount7,capturecount8;
 float32 capturecountthreshold3 = 10,capturecountthreshold4 = 10;
-float modify1 = (0.1),modify2 = (0.1);
+float modify1 = (0.05);
 CLARKE Current;
 CLARKE fluxClarke;
 CLARKE Vabc;

@@ -76,6 +76,7 @@ Peripheral Assignments:
 #include "FAST_vars.h"
 #include "EMIF_config.h"
 #include "Emif_asram.h"
+#include "sysctl.h"
 
 // **********************************************************
 // Prototypes for local functions within this file
@@ -96,6 +97,8 @@ Peripheral Assignments:
 interrupt void MotorControlISR(void);
 // interrupt for scib receiver
 interrupt void scibRxFifoIsr(void);
+// interrupt mode for watchdog test
+__interrupt void wakeupISR(void);
 
 // Core Motor Control Functions
 // ------------------------------
@@ -127,6 +130,7 @@ void GPIO_TogglePin(Uint16 pin);
 
 
 Uint16 RX_err=0;
+Uint32 wakeCount=0;
 //----------------------------------------------
 // SFF paras
 //----------------------------------------------
@@ -529,7 +533,7 @@ void GPIO_TogglePin(Uint16 pin)
 //*****************************************************************************
 //*****************************************************************************
 
-void main(void){
+    void main(void){
 
     // Initialize System Control:
     // PLL, WatchDog, enable Peripheral Clocks
@@ -769,6 +773,10 @@ void main(void){
     PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT3 (scib_rx)
     ScibRegs.SCIFFRX.bit.RXFFINTCLR = 1;
 
+    Interrupt_register(INT_WAKE, &wakeupISR);
+    Interrupt_enable(INT_WAKE);
+
+
     EDIS;
     //  ConfigCpuTimer(&CpuTimer0, 200, 100000);
     //  CpuTimer0Regs.TCR.all = 0x4000;
@@ -824,7 +832,20 @@ void main(void){
     scib_fifo_init();                   // Initialize the SCI FIFO
     setup_emif1_pinmux_async_16bit(0);  //setup EMIF Gpio
     config_device_number_Gpio();        // set up device number GPIO
-    device_number= set_device_number();
+    device_number= set_device_number(); // get device number by reset
+
+
+
+    SysCtl_setWatchdogMode(SYSCTL_WD_MODE_INTERRUPT);
+    //
+    // Reset the watchdog counter
+    //
+    SysCtl_serviceWatchdog();
+
+    //
+    // Enable the watchdog
+    //
+    SysCtl_enableWatchdog();
 
 
 
@@ -1131,15 +1152,15 @@ void B0(void)
     // loop rate synchronizer for B-tasks
     if(CpuTimer1Regs.TCR.bit.TIF == 1)
     {
-        CpuTimer1Regs.TCR.bit.TIF = 1;				// clear flag
+        CpuTimer1Regs.TCR.bit.TIF = 1;              // clear flag
 
         //-----------------------------------------------------------
-        (*B_Task_Ptr)();		// jump to a B Task (B1,B2,B3,...)
+        (*B_Task_Ptr)();        // jump to a B Task (B1,B2,B3,...)
         //-----------------------------------------------------------
-        VTimer1[0]++;			// virtual timer 1, instance 0 (spare)
+        VTimer1[0]++;           // virtual timer 1, instance 0 (spare)
     }
 
-    Alpha_State_Ptr = &C0;		// Allow C state tasks
+    Alpha_State_Ptr = &C0;      // Allow C state tasks
 }
 
 void C0(void)
@@ -1147,16 +1168,17 @@ void C0(void)
     // loop rate synchronizer for C-tasks
     if(CpuTimer2Regs.TCR.bit.TIF == 1)
     {
-        CpuTimer2Regs.TCR.bit.TIF = 1;				// clear flag
+        CpuTimer2Regs.TCR.bit.TIF = 1;              // clear flag
 
         //-----------------------------------------------------------
-        (*C_Task_Ptr)();		// jump to a C Task (C1,C2,C3,...)
+        (*C_Task_Ptr)();        // jump to a C Task (C1,C2,C3,...)
         //-----------------------------------------------------------
-        VTimer2[0]++;			//virtual timer 2, instance 0 (spare)
+        VTimer2[0]++;           //virtual timer 2, instance 0 (spare)
     }
 
-    Alpha_State_Ptr = &A0;	// Back to State A0
+    Alpha_State_Ptr = &A0;  // Back to State A0
 }
+
 
 
 //=================================================================================
@@ -1506,17 +1528,18 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     ////    voltage reconstruction
     phase_volt1_past = phase_volt1; // Store the previous value of phase voltage 1
     phase_volt2_past = phase_volt2; // Store the previous value of phase voltage 2
+    phase_volt3_past = phase_volt3; // Store the previous value of phase voltage 3
+
     ref_past1 = ref_volt1;         // Store the previous value of reference voltage 1
     ref_past2 = ref_volt2;         // Store the previous value of reference voltage 2
     ref_past3 = ref_volt3;         // Store the previous value of reference voltage 3
 
-    float duty_numerator = PWM_length;// (_iq)(ECap1Regs.CAP1 + ECap1Regs.CAP2 + ECap1Regs.CAP3 + ECap1Regs.CAP4);
-    ref_volt1_dir = _IQdiv((_iq)(ECap1Regs.CAP2 + ECap1Regs.CAP4) , duty_numerator);
-    ref_volt2_dir = _IQdiv((_iq)(ECap3Regs.CAP2 + ECap3Regs.CAP4) , duty_numerator);
-    ref_volt3_dir = _IQdiv((_iq)(ECap5Regs.CAP2 + ECap5Regs.CAP4) , duty_numerator);
-    phase_volt1_dir = _IQdiv((_iq)(ECap2Regs.CAP2 + ECap2Regs.CAP4) , duty_numerator);
-    phase_volt2_dir = _IQdiv((_iq)(ECap4Regs.CAP2 + ECap4Regs.CAP4) , duty_numerator);
-    phase_volt3_dir = _IQdiv((_iq)(ECap6Regs.CAP2 + ECap6Regs.CAP4) , duty_numerator);
+    ref_volt1_dir = _IQdiv((_iq)(ECap1Regs.CAP2 + ECap1Regs.CAP4) , ECap1Regs.CAP1 + ECap1Regs.CAP2 + ECap1Regs.CAP3 + ECap1Regs.CAP4);
+    ref_volt2_dir = _IQdiv((_iq)(ECap3Regs.CAP2 + ECap3Regs.CAP4) , ECap3Regs.CAP1 + ECap3Regs.CAP2 + ECap3Regs.CAP3 + ECap3Regs.CAP4);
+    ref_volt3_dir = _IQdiv((_iq)(ECap5Regs.CAP2 + ECap5Regs.CAP4) , ECap5Regs.CAP1 + ECap4Regs.CAP2 + ECap5Regs.CAP3 + ECap5Regs.CAP4);
+    phase_volt1_dir = _IQdiv((_iq)(ECap2Regs.CAP2 + ECap2Regs.CAP4) , ECap2Regs.CAP1 + ECap2Regs.CAP2 + ECap2Regs.CAP3 + ECap2Regs.CAP4);
+    phase_volt2_dir = _IQdiv((_iq)(ECap4Regs.CAP2 + ECap4Regs.CAP4) , ECap4Regs.CAP1 + ECap4Regs.CAP2 + ECap4Regs.CAP3 + ECap4Regs.CAP4);
+    phase_volt3_dir = _IQdiv((_iq)(ECap6Regs.CAP2 + ECap6Regs.CAP4) , ECap6Regs.CAP1 + ECap6Regs.CAP2 + ECap6Regs.CAP3 + ECap6Regs.CAP4);
 
     int integration_mode=1;
     ref_volt1= integration_mode ? ref_volt1_dir : lastPWM_duty(&ref1_cap2_last,&ref1_cap4_last,(_iq)ECap1Regs.CAP2,(_iq)ECap1Regs.CAP4)/PWM_length;
@@ -1555,16 +1578,30 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             trig2 = 0;
     }
 
+    // Check for stable conditions and adjust voltage inversion state for ref_volt2
+        if (ref_past3 == ref_volt3 && ref_volt3 < modify1 && trig3 == 1) {
+            inv3 = -1;
+        } else {
+            inv3 = 1;
+            if (ref_past1 != ref_volt1) // Detect change in ref_volt3 to reset trigger for ref_volt2
+                trig3 = 1;
+            if (inv3_past != inv3) // Reset trigger when inversion state changes
+                trig3 = 0;
+        }
+
     // voltage filtering
-    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
-    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
+//    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
+//    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
 
 
     // Adjust phase voltage direction based on inversion state
-    phase_volt1_dir=phase_volt1_dir*inv1;
-    phase_volt2_dir=phase_volt2_dir*inv2;
-    phase_volt1=phase_volt1*inv1; //V_ab
-    phase_volt2=phase_volt2*inv2; //V_bc
+    phase_volt1_dir=inv_disable? phase_volt1_dir : phase_volt1_dir*inv1;
+    phase_volt2_dir=inv_disable? phase_volt2_dir : phase_volt2_dir*inv2;
+    phase_volt3_dir=inv_disable? phase_volt3_dir : phase_volt3_dir*inv3;
+
+    phase_volt1=inv_disable? phase_volt1 : phase_volt1*inv1; //V_ab
+    phase_volt2=inv_disable? phase_volt2 : phase_volt2*inv2; //V_bc
+    phase_volt3=inv_disable? phase_volt3 : phase_volt3*inv3; //V_bc
 
     // check the input voltage mode
     if (VAC_measure_mode){
@@ -1872,16 +1909,17 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         int time_idx=IsrTicker%500;
         temp_test=(float)time_idx/500;
 //        temp_test=_IQcosPU(temp_test);
-        temp_data1= (Uint16) (_IQcosPU(temp_test)*32768+32768);
-        temp_data2= (Uint16) (_IQsinPU(temp_test)*32768+32768);
+        temp_data1= data_transmit_test ? (Uint16) (_IQcosPU(temp_test)*32768+32768): (Uint16)(mag_flux.Alpha*32768+32767
+                );
+        temp_data2= data_transmit_test ? (Uint16) (_IQsinPU(temp_test)*32768+32768): (Uint16)(mag_flux.Beta*32768+32767);
         // data buffer 1-4 for RUL
         updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Va*32768+32767));
         updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vc*32768+32767));
         updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha*32768+32767));
         updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta *32768+32767));
         //data buffer 5-6 for FAST
-        updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, (Uint16)(mag_flux.Alpha*32768+32767));
-        updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, (Uint16)(mag_flux.Beta*32768+32767));
+        updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, temp_data1);
+        updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, temp_data2);
 
         //Updating the rs485 package blocks
 
@@ -1981,13 +2019,15 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 2:
-            dacAval = (Uint16) _IQtoQ11(1 * phase_volt1 + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(1 *scale * motor->clarke.Beta + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale * phase_volt1 + _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * phase_volt2 + _IQ(1));
+            dacCval = (Uint16) _IQtoQ11(scale * phase_volt3 + _IQ(1));
             break;
 
         case 3:
-            dacAval = (Uint16) _IQtoQ11(Vabc.Alpha + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(motor->clarke.Alpha + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale*ref_volt2 + _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale*trig2);
+            dacCval = (Uint16) _IQtoQ11(scale*inv2 + _IQ(1));
             break;
 
         case 4:
@@ -2071,9 +2111,34 @@ interrupt void MotorControlISR(void)
     motorCurrentSense();            //  Measure normalized phase currents (-1,+1)
     motorVACSense(&Va,&Vb,&Vc);     //  Measure normalized phase voltages (-1,+1)
     posEncoder(&motor1);            //  Motor 1 Position encoder
-    if (time_out_count++>time_out) {// servo off if connection timeout
-        GPIO_WritePin(SV_ON_GPIO,1);
-        time_out_count=0;
+
+//    if (time_out_count++>time_out) {// servo off if connection timeout (NTU testplant version)
+//        GPIO_WritePin(SV_ON_GPIO,1);
+//        time_out_count=0;
+//    }
+
+    // reset system if master disconnect timeout (Tecom RUL version)
+    if (Master_timeout_prescaler_cnt++>Master_timeout_prescaler){
+        Master_timeout_prescaler_cnt=0;
+        Master_timeout_count++;
+    }
+    // prescale counter
+    if (Master_timeout_count<(Uint32)(Master_timeout*PWM_FREQUENCY*10)) {
+        // if disconnect, stop feed dog to trigger reset
+        SysCtl_serviceWatchdog();
+    }
+
+    // sci transmit test code
+    if (sci_send_test==1){
+        int i;
+        GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+        for (i=0;i<5;i++) {
+            scib_xmit(sci_test_array[i]);           // send test value
+        }
+        while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+        while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+        GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+//        sci_send_test=0;
     }
 
 
@@ -2112,7 +2177,7 @@ interrupt void MotorControlISR(void)
     // ------------------------------------------------------------------------------
     DAC_PTR[DACA]->DACVALS.all = dacAval;
     DAC_PTR[DACB]->DACVALS.all = dacBval;
-    //    DAC_PTR[DACC]->DACVALS.all = dacCval;
+    DAC_PTR[DACC]->DACVALS.all = dacCval;
 
     //clear ADCINT1 INT and ack PIE INT
     AdcbRegs.ADCINTFLGCLR.bit.ADCINT1=1;
@@ -2152,7 +2217,7 @@ interrupt void scibRxFifoIsr(void)
 
 
     if (cmd_rcv){
-        time_out_count=0; //reset timeout if cmd receive
+        Master_timeout_count=0; //reset timeout if cmd receive
         int Master_cmd=ReceivedChar[2];
         switch (Master_cmd){
 
@@ -2384,6 +2449,17 @@ inline void send_data_package(Uint16 device_num, Uint16 data1,Uint16 data2,Uint1
     while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
     while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
     GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+}
+
+// wakeup ISR
+__interrupt void
+wakeupISR(void)
+{
+    wakeCount++;
+    //
+    // Acknowledge this interrupt located in group 1
+    //
+    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP1);
 }
 
 //inline void set_communication_mode(Uint16 communication_mode_active){

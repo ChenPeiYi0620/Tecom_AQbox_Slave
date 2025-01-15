@@ -88,7 +88,7 @@ This line sets the BUILDLEVEL to one of the available choices.
 #define		mSec1000	1000*SYSTEM_FREQUENCY*1000	// 1000 mS
 
 // Define the ISR frequency (kHz)
-#define  PWM_FREQUENCY        20
+#define  PWM_FREQUENCY        10
 #define  ISR_FREQUENCY        PWM_FREQUENCY
 #define  INV_PWM_TICKS        ((SYSTEM_FREQUENCY/2.0)/PWM_FREQUENCY)*1000
 #define  INV_PWM_TBPRD        INV_PWM_TICKS/2
