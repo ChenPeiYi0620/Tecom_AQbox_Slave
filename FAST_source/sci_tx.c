@@ -20,10 +20,10 @@ myuint myuint_test;
 int send_en=0,FAST_enable=1,send_delay=-1;
 Uint16 send_datalength=2000;
 // timeout the motor servo when disconnected for 10 s
-Uint32 sci_count,send_count,Master_timeout_count;
+Uint32 sci_count,send_count,Master_timeout_count=0,Master_timeout_cnt_en=0;
 Uint32 Master_timeout=10; // master disconnect timeout limit in second
 Uint32 Master_timeout_prescaler=100, Master_timeout_prescaler_cnt=0; // master disconnect timeout prescaler
-Uint16 ReceivedChar[16],ReceivedChar2=0,device_number=100;
+Uint16 ReceivedChar[16]={0},ReceivedChar2=0,device_number;
 Uint16 crc1,crc2;
 float temp_test;
 Uint16 temp_data1,temp_data2;
@@ -31,7 +31,7 @@ Uint16 update_FAST_en=1;
 Uint16 data_transmit_test=0;
 Uint16 Rs_U16,Ls_U16,H_8bits,L_8bits ;
 Uint16 test_count,cmd_rcv_time;
-int sci_send_test=0;
+Uint16 sci_send_test=0;
 Uint16 sci_test_array[5]={5, 5, 5, 5, 5};
 
 void InitsciGpio(void)
@@ -323,6 +323,20 @@ void updateCircularBuffer(volatile Uint16 arr[], int size, int *head, Uint16 new
     arr[*head] = newValue;  //update data at head address
 //    *head = (*head + 1) % size;  // update head address, circular the buffer
     *head = (*head + 2) % size;  // for EMIF wrong layout only
+}
+
+void sci_test_send(Uint16 data[], int size, Uint16 *send_falg){
+    if (*send_falg==1){
+        int i;
+        GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+        for (i=0;i<size;i++) {
+            scib_xmit(data[i]);           // send test value
+        }
+        while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+        while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+        GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+//        sci_send_test=0;
+    }
 }
 
 

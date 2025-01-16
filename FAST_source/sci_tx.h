@@ -51,7 +51,7 @@ extern myfloat myfloat_test;
 extern myuint myuint_test;
 extern int send_en,FAST_enable,send_delay;
 extern Uint16 send_datalength;
-extern Uint32 sci_count,send_count,Master_timeout_count;
+extern Uint32 sci_count,send_count,Master_timeout_count,Master_timeout_cnt_en;
 extern Uint32 Master_timeout, Master_timeout_prescaler,Master_timeout_prescaler_cnt;
 extern Uint16 ReceivedChar[16],ReceivedChar2,device_number;
 extern Uint16 crc1,crc2;
@@ -61,7 +61,7 @@ extern Uint16 update_FAST_en;
 extern Uint16 data_transmit_test;
 extern Uint16 Rs_U16,Ls_U16,H_8bits,L_8bits ;
 extern Uint16 test_count,cmd_rcv_time;
-extern int sci_send_test;
+extern Uint16 sci_send_test;
 extern Uint16 sci_test_array[5];
 
 void InitsciGpio(void);
@@ -81,4 +81,5 @@ void scib_uint(unsigned int fl);
 void scic_uint(unsigned int fl);
 int scib_send_FAST(Uint16 send_datalength, Uint32 *sci_count, int send_delay,Uint16 first_and_last_data_block[],Uint16 FAST_data[],Uint16 device_number);
 void updateCircularBuffer(volatile Uint16 arr[], int size, int *head, Uint16 newValue);
+void sci_test_send(Uint16 data[], int size, Uint16 *send_falg);
 #endif

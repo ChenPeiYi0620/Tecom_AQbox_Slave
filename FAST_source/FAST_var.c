@@ -26,8 +26,8 @@ myfloat my_Vac_OffsetA,my_Vac_OffsetB, my_Vac_OffsetC;
 //------------------------------------
 float Vdc = (300);//220VAC to DC bus;
 float CURRENT = (15.389); //15.389 for TM101-OCS
-float Flux_Rs = (12.1);//0.4
-float Ls = (0.009615);//(0.009615)
+float Flux_Rs;//12.1
+float Ls;//(0.009615)
 float Lq = (0.0092);//0.0144234
 float Ld = (0.0092) ;//0.0144234
 float Lamda_m = (0.043);//0.045

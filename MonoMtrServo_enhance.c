@@ -835,19 +835,15 @@ void GPIO_TogglePin(Uint16 pin)
     device_number= set_device_number(); // get device number by reset
 
 
-
-    SysCtl_setWatchdogMode(SYSCTL_WD_MODE_INTERRUPT);
-    //
+    // set up watchdog
+    SysCtl_setWatchdogMode(SYSCTL_WD_MODE_RESET);
+//    SysCtl_setWatchdogMode(SYSCTL_WD_MODE_INTERRUPT);
+    SysCtl_setWatchdogPredivider(SYSCTL_WD_PREDIV_2048);
+    SysCtl_setWatchdogPrescaler(SYSCTL_WD_PRESCALE_64);
     // Reset the watchdog counter
-    //
     SysCtl_serviceWatchdog();
-
-    //
     // Enable the watchdog
-    //
     SysCtl_enableWatchdog();
-
-
 
     bool EMIF_success = (setup_EMIF() == 0);
 
@@ -2117,30 +2113,35 @@ interrupt void MotorControlISR(void)
 //        time_out_count=0;
 //    }
 
+    // if BRKDT occur, reset the buffer
+        if (ScibRegs.SCIRXST.bit.RXERROR==1){
+            test_count++; // error times count
+            if(ScibRegs.SCIRXST.bit.BRKDT==1){
+                EALLOW;
+                ScibRegs.SCICTL1.bit.SWRESET=0;//reset err flag
+                ScibRegs.SCICTL1.bit.SWRESET=1;//re-enable
+                EDIS;
+            }
+        }
+
     // reset system if master disconnect timeout (Tecom RUL version)
     if (Master_timeout_prescaler_cnt++>Master_timeout_prescaler){
         Master_timeout_prescaler_cnt=0;
-        Master_timeout_count++;
+        if (Master_timeout_cnt_en){
+            Master_timeout_count++;
+        }
     }
-    // prescale counter
+    // prescale the timeout counter
     if (Master_timeout_count<(Uint32)(Master_timeout*PWM_FREQUENCY*10)) {
         // if disconnect, stop feed dog to trigger reset
         SysCtl_serviceWatchdog();
     }
-
-    // sci transmit test code
-    if (sci_send_test==1){
-        int i;
-        GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
-        for (i=0;i<5;i++) {
-            scib_xmit(sci_test_array[i]);           // send test value
-        }
-        while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
-        while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
-        GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
-//        sci_send_test=0;
+    else {
+        Master_timeout_cnt_en=1;
     }
 
+    // sci transmit test code
+    sci_test_send(sci_test_array, 5, &sci_send_test);
 
     //    acc_y=(float)AdcaResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR;
     //    systemp=(float)AdcbResultRegs.ADCRESULT1*ADC_PU_SCALE_FACTOR*3.3/0.01;
@@ -2196,22 +2197,23 @@ interrupt void scibRxFifoIsr(void)
     }
 
 
-    // if BRKDT occur, reset the buffer
-    if (ScibRegs.SCIRXST.bit.RXERROR==1){
-        test_count++; // error times count
-        if(ScibRegs.SCIRXST.bit.BRKDT==1){
-            EALLOW;
-            ScibRegs.SCICTL1.bit.SWRESET=0;//reset err flag
-            ScibRegs.SCICTL1.bit.SWRESET=1;//re-enable
-            EDIS;
-        }
-    }
+//    // if BRKDT occur, reset the buffer
+//    if (ScibRegs.SCIRXST.bit.RXERROR==1){
+//        test_count++; // error times count
+//        if(ScibRegs.SCIRXST.bit.BRKDT==1){
+//            EALLOW;
+//            ScibRegs.SCICTL1.bit.SWRESET=0;//reset err flag
+//            ScibRegs.SCICTL1.bit.SWRESET=1;//re-enable
+//            EDIS;
+//        }
+//    }
 
 
     int cmd_rcv=0;//command receive
     if (ReceivedChar[0]==1 && ReceivedChar[1]==device_number){
-        cmd_rcv=1;
-        update_FAST_en=0; // stop FAST data buffer update
+        cmd_rcv=1;                  // set cmd receive flag
+        update_FAST_en=0;           // stop FAST data buffer update
+        Master_timeout_cnt_en=1;    // this device is online, enable timeout reset
         cmd_rcv_time++;
     }
 
@@ -2461,6 +2463,27 @@ wakeupISR(void)
     //
     Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP1);
 }
+
+//void CheckResetCount(void) {
+//    EALLOW;
+//    uint16_t resetCause = SysCtl_getResetCause();
+//
+//    if (resetCause & SYSCTL_RESC_WDRSN) {
+//        // 復位次數增加
+//        reset_count++;
+////        if (reset_count >= RESET_COUNT_LIMIT) {
+////            // 停用 Watchdog，進入安全模式
+////            SysCtl_disableWatchdog();
+////        }
+//    } else {
+//        // 非 Watchdog 復位，重置計數
+//        reset_count = 0;
+//    }
+//
+//    SysCtl_clearResetCause(SYSCTL_CAUSE_WDOG);
+//    EDIS;
+//}
+
 
 //inline void set_communication_mode(Uint16 communication_mode_active){
 //    EALLOW;
