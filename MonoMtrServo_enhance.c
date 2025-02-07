@@ -104,7 +104,7 @@ __interrupt void wakeupISR(void);
 // ------------------------------
 #if BUILDLEVEL  != LEVEL1
 inline void motorCurrentSense(void);
-inline void motorVACSense(float *Va,float *Vb,float *Vc );
+inline void motorVACSense(float *Va,float *Vb,float *Vc, int measure_mode );
 //inline void motorACCSense(float *acc);
 //inline void motorACCSense(float *temp);
 //inline void set_communication_mode(Uint16 communication_mode_active);
@@ -299,11 +299,15 @@ inline void motorCurrentSense()
     return;
 }
 
-inline void motorVACSense(float *Va,float *Vb,float *Vc )
+inline void motorVACSense(float *Va,float *Vb,float *Vc , int measure_mode)
 {
-    *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetA; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    *Vb = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetB; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
-    *Vc = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetC; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+    if (measure_mode){
+        // update voltage measurement if in VAC measure mpode
+        *Va = (float)AdcaResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetA; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+        *Vb = (float)AdccResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetB; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+        *Vc = (float)AdcdResultRegs.ADCRESULT4*ADC_PU_SCALE_FACTOR-Vac_OffsetC; //(float)IFB_A1_PPB* ADC_PU_PPB_SCALE_FACTOR;
+
+    }
         return;
 }
 
@@ -1601,16 +1605,18 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
     // check the input voltage mode
     if (VAC_measure_mode){
-        Vabc.As=Va;
-        Vabc.Bs=-Va-Vc;
-        Vabc.Cs=Vc;
+        LinetoPhase_shift( (Va-Vb), (Vb-Vc), (Vc-Va), &Vabc);
     }
     else {
+
         LinetoPhase(phase_volt1,phase_volt2,&Vabc);
+        // abc to Alpha Beta
+           CLARKE_MACRO(Vabc);
+           Va=Vabc.Alpha;
+           Vc=Vabc.Beta;
     }
 
-    // abc to Alpha Beta
-    CLARKE_MACRO(Vabc);
+
 
 
     //---------------------------------------------------------------------------------
@@ -1903,19 +1909,18 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
         // circularly update the data buffer
         int time_idx=IsrTicker%500;
-        temp_test=(float)time_idx/500;
+        temp_test=(float)time_idx/500*4;
 //        temp_test=_IQcosPU(temp_test);
-        temp_data1= data_transmit_test ? (Uint16) (_IQcosPU(temp_test)*32768+32768): (Uint16)(mag_flux.Alpha*32768+32767
-                );
-        temp_data2= data_transmit_test ? (Uint16) (_IQsinPU(temp_test)*32768+32768): (Uint16)(mag_flux.Beta*32768+32767);
+        temp_data1= data_transmit_test ? (Uint16) (_IQcosPU(temp_test)*32768+32768): (Uint16)(Va*32768+32767);//mag_flux.Beta
+        temp_data2= data_transmit_test ? (Uint16) (_IQsinPU(temp_test)*32768+32768): (Uint16)(Vc*32768+32767)   ;//mag_flux.Beta
         // data buffer 1-4 for RUL
-        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(Va*32768+32767));
-        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(Vc*32768+32767));
+        updateCircularBuffer(AsramData.data1, MAX_EMIF_length, &head1, (Uint16)(temp_data1));
+        updateCircularBuffer(AsramData.data2, MAX_EMIF_length, &head2, (Uint16)(temp_data2));
         updateCircularBuffer(AsramData.data3, MAX_EMIF_length, &head3, (Uint16)(motor->clarke.Alpha*32768+32767));
         updateCircularBuffer(AsramData.data4, MAX_EMIF_length, &head4, (Uint16)(motor->clarke.Beta *32768+32767));
         //data buffer 5-6 for FAST
-        updateCircularBuffer(AsramData.data5, MAX_EMIF_length, &head5, temp_data1);
-        updateCircularBuffer(AsramData.data6, MAX_EMIF_length, &head6, temp_data2);
+        updateCircularBuffer(AsramData.data5, FAST_EMIF_length, &head5, temp_data1);
+        updateCircularBuffer(AsramData.data6, FAST_EMIF_length, &head6, temp_data2);
 
         //Updating the rs485 package blocks
 
@@ -2105,7 +2110,7 @@ interrupt void MotorControlISR(void)
     //  Measure phase currents and obtain position encoder (QEP) feedback
     // ------------------------------------------------------------------------------
     motorCurrentSense();            //  Measure normalized phase currents (-1,+1)
-    motorVACSense(&Va,&Vb,&Vc);     //  Measure normalized phase voltages (-1,+1)
+    motorVACSense(&Va,&Vb,&Vc, VAC_measure_mode);     //  Measure normalized phase voltages (-1,+1)
     posEncoder(&motor1);            //  Motor 1 Position encoder
 
 //    if (time_out_count++>time_out) {// servo off if connection timeout (NTU testplant version)
@@ -2189,24 +2194,27 @@ interrupt void MotorControlISR(void)
 interrupt void scibRxFifoIsr(void)
 {
     // wait receive buffer for 0.1 ms to ensure data received
-    DELAY_US(200);
-    sci_sts_count=0;
-    while (ScibRegs.SCIFFRX.bit.RXFFST > 0) {   // check if FIFO has data
-        ReceivedChar[sci_sts_count] = ScibRegs.SCIRXBUF.all; // read from FIFO
-        sci_sts_count++;
+//    DELAY_US(1200); // wait for 1s
+
+    uint16_t lastFifoCount = ScibRegs.SCIFFRX.bit.RXFFST;
+    uint16_t timeoutCounter = 0;
+
+    // check no new FIFO receive every 10000 sysclk
+    while (timeoutCounter < 10000) {
+        if (ScibRegs.SCIFFRX.bit.RXFFST != lastFifoCount) {
+            lastFifoCount = ScibRegs.SCIFFRX.bit.RXFFST;
+            timeoutCounter = 0;
+        } else {
+            timeoutCounter++;
+        }
     }
 
+    // FIFO receive complete, read the command
+    sci_sts_count=0;
+    while (ScibRegs.SCIFFRX.bit.RXFFST > 0) {   // check if FIFO has data
+        ReceivedChar[sci_sts_count++] = ScibRegs.SCIRXBUF.all; // read FIFO
+    }
 
-//    // if BRKDT occur, reset the buffer
-//    if (ScibRegs.SCIRXST.bit.RXERROR==1){
-//        test_count++; // error times count
-//        if(ScibRegs.SCIRXST.bit.BRKDT==1){
-//            EALLOW;
-//            ScibRegs.SCICTL1.bit.SWRESET=0;//reset err flag
-//            ScibRegs.SCICTL1.bit.SWRESET=1;//re-enable
-//            EDIS;
-//        }
-//    }
 
 
     int cmd_rcv=0;//command receive
@@ -2226,6 +2234,7 @@ interrupt void scibRxFifoIsr(void)
         case 1: //device status check
             GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
             VAC_measure_mode= ReceivedChar[4]==1 ? 1:0;  // if 0 : PWM mode, if 1 : VAC mode
+            data_transmit_test= ReceivedChar[5]==1 ? 1:0;  // if 1 : send test data
             scib_xmit(2);                               // from slave
             scib_xmit(device_number);                   // device number to avoid conflict
             scib_xmit(~(device_number & 0xFFFF));       // slave response code
@@ -2253,7 +2262,7 @@ interrupt void scibRxFifoIsr(void)
             communication_mode_active=1;
             //circular buffer for FAST data  。
             cb_index=head1 +sci_count*2;
-            cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
+            cb_index= (cb_index>=MAX_EMIF_length) ? cb_index % MAX_EMIF_length : cb_index; // redirect pointer if overflow
             send_data_package( device_number, AsramData.data5[cb_index], AsramData.data6[cb_index],1145,1419);
             sci_count++;// for sending times check
             break;
@@ -2262,14 +2271,27 @@ interrupt void scibRxFifoIsr(void)
             // entering communication mode for continuous transmit
             communication_mode_active=1;
 
+            // determine the transmit data from the package ID
+//            myuint pkt_id; // package number
+            pkt_id.raw.second  = ReceivedChar[4];
+            pkt_id.raw.first  = ReceivedChar[3];
+            if (pkt_id.f==0){
+                rul_start_idx=head1; // fix the start index at fir  st package
+                cb_index=rul_start_idx+pkt_id.f;
+            }
+            else {
+                cb_index=rul_start_idx+pkt_id.f;
+            }
+
             //circular buffer for FAST data  。
-            cb_index=head1 +sci_count*2;
+            //cb_index=head1 +sci_count*2;
+
             cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
             send_data_package( device_number,AsramData.data1[cb_index], AsramData.data2[cb_index],AsramData.data3[cb_index],AsramData.data4[cb_index]);
             sci_count++;// for sending times check
             break;
 
-        case 5:// command =5: device data collection stop
+        case 5:// command =5: reset collection and enable ADC update
             // leave communication mode
             communication_mode_active=0;
             //            set_communication_mode(communication_mode_active);
@@ -2324,7 +2346,7 @@ interrupt void scibRxFifoIsr(void)
             GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
             break;
 
-        case 7: // data collectfor motor cn status  (Torque, Efficiency, Short index )
+        case 7: // data collection for motor cn status  (Torque, Efficiency, Short index )
             // for sending times check
             sci_count++;
             //circular buffer for FAST data  。
@@ -2426,9 +2448,10 @@ interrupt void scibRxFifoIsr(void)
     }
 
     // Force to clear FIFO receiver
-    while (ScibRegs.SCIFFRX.bit.RXFFST!=0){
-        int a =ScibRegs.SCIRXBUF.all;
+    while (ScibRegs.SCIFFRX.bit.RXFFST) {
+        volatile int discard = ScibRegs.SCIRXBUF.all;
     }
+
     GPIO_WritePin(TX_EN_GPIO,0);               // enable receiver
 
     ScibRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
@@ -2447,7 +2470,7 @@ inline void send_data_package(Uint16 device_num, Uint16 data1,Uint16 data2,Uint1
     scib_uint(data2);
     scib_uint(data3);
     scib_uint(data4);
-    DELAY_US(100); // make sure data transmit complete
+//    DELAY_US(100); // make sure data transmit complete
     while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
     while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
     GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver

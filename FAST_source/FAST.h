@@ -105,7 +105,7 @@ extern float phase_volt1_last,phase_volt2_last,phase_volt2_las1,phase_volt2_las2
 float lastPWM_duty(float *ref1_cap2_last, float *ref1_cap4_last, float CAP2,
                    float CAP4);
 void LinetoPhase(_iq Line_A, _iq Line_B, CLARKE *phase_volt);
-
+void LinetoPhase_shift(_iq Vab, _iq Vbc, _iq Vca, CLARKE *phase_volt);
 void EMFtoLPF(float samplingTime, float LPF_radius, EMF *EMF);
 void Flux_comp(_iq omega_e, _iq LPF_radius, _iq *mag_comp, _iq *phase_comp);
 void Flux_CurModel(_iq Ld, _iq Lq, _iq Lamda_m, _iq idr, _iq iqr,

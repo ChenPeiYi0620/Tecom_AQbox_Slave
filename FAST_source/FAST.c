@@ -54,7 +54,12 @@ void LinetoPhase(_iq Line_A, _iq Line_B, CLARKE *phase_volt)
 {
      phase_volt->As= _IQmpy(_IQ(0.333333),(_IQmpy(_IQ(2),Line_A)+Line_B));
      phase_volt->Bs = _IQmpy(_IQ(0.333333),(-Line_A+Line_B));
+}
 
+void LinetoPhase_shift(_iq Vab, _iq Vbc, _iq Vca, CLARKE *phase_volt)
+{
+     phase_volt->Alpha = Vab*0.866-Vca*0.866;
+     phase_volt->Beta  = Vbc-0.5*Vab+Vca*0.5;
 }
 
 void EMFtoLPF(float samplingTime, float LPF_radius, EMF *EMF)

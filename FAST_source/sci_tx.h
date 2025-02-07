@@ -44,11 +44,11 @@ typedef union {
 
 extern Uint16 first_and_last_data_block[8]; //first and last data package of rs485
 extern Uint16 FAST_data[4]; //Fast data for transmission (only used for version1 with EMIF wrong Layout)
-extern int cb_index; // pointer for circular buffer transmission
+extern int cb_index, rul_start_idx; // pointer for circular buffer transmission
 
 extern unsigned int test_ftoint;
 extern myfloat myfloat_test;
-extern myuint myuint_test;
+extern myuint myuint_test, pkt_id;
 extern int send_en,FAST_enable,send_delay;
 extern Uint16 send_datalength;
 extern Uint32 sci_count,send_count,Master_timeout_count,Master_timeout_cnt_en;

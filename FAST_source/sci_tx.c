@@ -12,16 +12,15 @@
 //----------------------------------------------
 Uint16 first_and_last_data_block[8]; //first and last data package of rs485
 Uint16 FAST_data[4]; //Fast data for transmission (only used for version1 with EMIF wrong Layout)
-int cb_index; // pointer for circular buffer transmission
-
+int cb_index, rul_start_idx; // pointer for circular buffer transmission
 unsigned int test_ftoint;
 myfloat myfloat_test;
-myuint myuint_test;
+myuint myuint_test, pkt_id;
 int send_en=0,FAST_enable=1,send_delay=-1;
 Uint16 send_datalength=2000;
 // timeout the motor servo when disconnected for 10 s
 Uint32 sci_count,send_count,Master_timeout_count=0,Master_timeout_cnt_en=0;
-Uint32 Master_timeout=10; // master disconnect timeout limit in second
+Uint32 Master_timeout=500; // master disconnect timeout limit in second
 Uint32 Master_timeout_prescaler=100, Master_timeout_prescaler_cnt=0; // master disconnect timeout prescaler
 Uint16 ReceivedChar[16]={0},ReceivedChar2=0,device_number;
 Uint16 crc1,crc2;
@@ -92,16 +91,15 @@ void scib_loopback_init(void)
     ScibRegs.SCICTL2.bit.TXINTENA = 0;
     ScibRegs.SCICTL2.bit.RXBKINTENA = 0;
 
-    // @LSPCLK = 25 MHz (200 MHz SYSCLK) HBAUD = 0x01 and LBAUD = 0x45.
-    // @LSPCLK = 50 MHz (200 MHz SYSCLK) HBAUD = 0x02 and LBAUD = 0x8B.
-    // @LSPCLK = 100 MHz (200 MHz SYSCLK) HBAUD = 0x05 and LBAUD = 0x15.
+    // Baud rate setting
+//    ScibRegs.SCIHBAUD.all = 0x0000;
+//    ScibRegs.SCILBAUD.all = 0x000D;//~921600 bps @100MHz
+
     ScibRegs.SCIHBAUD.all = 0x0000;
-    ScibRegs.SCILBAUD.all = 0x000D;//~921600 bps @100MHz
+    ScibRegs.SCILBAUD.all = 0x006B; //~1152000 bps @100MHz
+
 //    ScibRegs.SCILBAUD.all = 0x0013;//61000 bps @100MHz
 //    ScibRegs.SCILBAUD.all = 0x000A;//576000 bps @100MHz
-//
-//    ScibRegs.SCIHBAUD.all = 0x0002;
-//    ScibRegs.SCILBAUD.all = 0x008A;//9600bps
 
     ScibRegs.SCICCR.bit.LOOPBKENA = 0; // Disable  loop back
 
@@ -168,7 +166,7 @@ void scib_xmit(int a)
 void scib_fifo_init(void)
 {
     ScibRegs.SCIFFTX.all = 0xE040; // tx interrupt disable
-    ScibRegs.SCIFFRX.all = 0x0021; // 4-word FIFO triggering
+    ScibRegs.SCIFFRX.all = 0x0024; // 4-word FIFO triggering
     ScibRegs.SCIFFCT.all = 0x0;
     ScibRegs.SCIFFTX.bit.TXFIFORESET = 1;
     ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
