@@ -9,7 +9,7 @@
 #define EMIF_ASRAM_H_
 #include "motorVars.h"
 
-#define MAX_EMIF_length 10000
+#define MAX_EMIF_length 5000
 #define FAST_EMIF_length 2000
 
 struct ASRAM_data{

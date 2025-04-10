@@ -82,4 +82,7 @@ void scic_uint(unsigned int fl);
 int scib_send_FAST(Uint16 send_datalength, Uint32 *sci_count, int send_delay,Uint16 first_and_last_data_block[],Uint16 FAST_data[],Uint16 device_number);
 void updateCircularBuffer(volatile Uint16 arr[], int size, int *head, Uint16 newValue);
 void sci_test_send(Uint16 data[], int size, Uint16 *send_falg);
+void send_slave_ack(Uint16 id);
+void send_echo_response(Uint16 offset, Uint16 len);
+
 #endif

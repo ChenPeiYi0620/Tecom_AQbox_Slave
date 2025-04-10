@@ -92,11 +92,11 @@ void scib_loopback_init(void)
     ScibRegs.SCICTL2.bit.RXBKINTENA = 0;
 
     // Baud rate setting
-//    ScibRegs.SCIHBAUD.all = 0x0000;
-//    ScibRegs.SCILBAUD.all = 0x000D;//~921600 bps @100MHz
-
     ScibRegs.SCIHBAUD.all = 0x0000;
-    ScibRegs.SCILBAUD.all = 0x006B; //~1152000 bps @100MHz
+    ScibRegs.SCILBAUD.all = 0x000D;//~921600 bps @100MHz
+
+//    ScibRegs.SCIHBAUD.all = 0x0000;
+//    ScibRegs.SCILBAUD.all = 0x006B; //~115200 bps @100MHz
 
 //    ScibRegs.SCILBAUD.all = 0x0013;//61000 bps @100MHz
 //    ScibRegs.SCILBAUD.all = 0x000A;//576000 bps @100MHz
@@ -338,3 +338,28 @@ void sci_test_send(Uint16 data[], int size, Uint16 *send_falg){
 }
 
 
+// tell the master command received
+void send_slave_ack(Uint16 id) {
+    GPIO_WritePin(TX_EN_GPIO, 1);
+    scib_xmit(2);
+    scib_xmit(device_number);
+    scib_xmit(~(device_number & 0xFFFF));
+    scib_xmit(id);
+    while (ScibRegs.SCIFFTX.bit.TXFFST != 0) {}
+    while (ScibRegs.SCICTL2.bit.TXEMPTY != 1) {}
+    GPIO_WritePin(TX_EN_GPIO, 0);
+}
+
+// echo back data to master
+void send_echo_response(Uint16 offset, Uint16 len) {
+    GPIO_WritePin(TX_EN_GPIO, 1);
+    scib_xmit(2);
+    scib_xmit(device_number);
+    Uint16 i = 0;
+    for (i=0; i < len; i++) {
+        scib_xmit(ReceivedChar[offset + i]);
+    }
+    while (ScibRegs.SCIFFTX.bit.TXFFST != 0) {}
+    while (ScibRegs.SCICTL2.bit.TXEMPTY != 1) {}
+    GPIO_WritePin(TX_EN_GPIO, 0);
+}

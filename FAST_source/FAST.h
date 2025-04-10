@@ -91,6 +91,10 @@ extern int integration_mode, inv_disable;
 extern float ref_theta;
 extern int16 inv1,inv2,inv3,inv1_past,inv2_past,inv3_past,trig1,trig2,trig3;
 extern float vol_filter_thres;
+extern int16 hold_duration, inv_duration_cnt_en1, inv_duration_cnt1, inv_duration_cnt_en2, inv_duration_cnt2, inv_duration_cnt_en3, inv_duration_cnt3;
+extern int16 pos_duration_cnt_en1, pos_duration_cnt1, pos_duration_cnt_en2, pos_duration_cnt2, pos_duration_cnt_en3, pos_duration_cnt3;
+extern int16 m_wave_cnt, flag1;
+extern float m_wave_window[11], m_wave_duration, m_wave_duration_fft;
 
 //V pole clib parameters
 //Vpol_feature(V1_feature,ref_elms1,ref_volt1,ref_volt1_last,corr_count, corr_count_limit);

@@ -160,7 +160,7 @@ int autotune_enable = 0;
 _iq smooth_data[5],smooth_data_temp[5],F_angle3;
 _iq Flux_A_est,Flux_B_est,B_damp=0;
 int sm_length=5,count_i;
-int dac_out=3;
+int dac_out=2;
 
 int sci_sts_count=0;
 // external sensor
@@ -1541,7 +1541,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     phase_volt2_dir = _IQdiv((_iq)(ECap4Regs.CAP2 + ECap4Regs.CAP4) , ECap4Regs.CAP1 + ECap4Regs.CAP2 + ECap4Regs.CAP3 + ECap4Regs.CAP4);
     phase_volt3_dir = _IQdiv((_iq)(ECap6Regs.CAP2 + ECap6Regs.CAP4) , ECap6Regs.CAP1 + ECap6Regs.CAP2 + ECap6Regs.CAP3 + ECap6Regs.CAP4);
 
-    int integration_mode=1;
+    // choose the PWM duty base (constant or accumulated)
+
     ref_volt1= integration_mode ? ref_volt1_dir : lastPWM_duty(&ref1_cap2_last,&ref1_cap4_last,(_iq)ECap1Regs.CAP2,(_iq)ECap1Regs.CAP4)/PWM_length;
     ref_volt2= integration_mode ? ref_volt2_dir : lastPWM_duty(&ref2_cap2_last,&ref2_cap4_last,(_iq)ECap3Regs.CAP2,(_iq)ECap3Regs.CAP4)/PWM_length;
     ref_volt3= integration_mode ? ref_volt3_dir : lastPWM_duty(&ref3_cap2_last,&ref3_cap4_last,(_iq)ECap5Regs.CAP2,(_iq)ECap5Regs.CAP4)/PWM_length;
@@ -1556,38 +1557,81 @@ inline void BuildLevel2(MOTOR_VARS * motor)
     inv2_past = inv2; // Store the previous value of inv2
     inv3_past = inv3; // Store the previous value of inv3
 
-    // Check for stable conditions and adjust voltage inversion state for ref_volt1
-    if (ref_past1 == ref_volt1 && ref_volt1 < modify1 && trig1 == 1) {
-        inv1 = -1;
-    } else {
-        inv1 = 1;
-        if (ref_past2 != ref_volt2) // Detect change in ref_volt2 to reset trigger for ref_volt1
-            trig1 = 1;
-        if (inv1_past != inv1) // Reset trigger when inversion state changes
-            trig1 = 0;
-    }
+    // polarity correction
 
-    // Check for stable conditions and adjust voltage inversion state for ref_volt2
-    if (ref_past2 == ref_volt2 && ref_volt2 < modify1 && trig2 == 1) {
-        inv2 = -1;
-    } else {
-        inv2 = 1;
-        if (ref_past3 != ref_volt3) // Detect change in ref_volt3 to reset trigger for ref_volt2
-            trig2 = 1;
-        if (inv2_past != inv2) // Reset trigger when inversion state changes
-            trig2 = 0;
+    // calculate m-wave period
+    // find local min by moving winsow
+    int m_wave_i;
+    for ( m_wave_i = 0; m_wave_i < 10; m_wave_i++) {
+        m_wave_window[m_wave_i] = m_wave_window[m_wave_i + 1];
     }
+    m_wave_window[10] = phase_volt1;
 
-    // Check for stable conditions and adjust voltage inversion state for ref_volt2
-        if (ref_past3 == ref_volt3 && ref_volt3 < modify1 && trig3 == 1) {
-            inv3 = -1;
-        } else {
-            inv3 = 1;
-            if (ref_past1 != ref_volt1) // Detect change in ref_volt3 to reset trigger for ref_volt2
-                trig3 = 1;
-            if (inv3_past != inv3) // Reset trigger when inversion state changes
-                trig3 = 0;
+    // calculate the duration between two local min
+    if (m_wave_window[5] < m_wave_window[0] && m_wave_window[5] < m_wave_window[10]){
+        flag1=flag1? 0 : 1;
+        if (flag1==1 && m_wave_cnt>11){
+            m_wave_duration=m_wave_cnt*0.01+m_wave_duration*0.99;
+            m_wave_cnt=0;
         }
+        else{
+            flag1=0;
+        }
+    }
+    m_wave_cnt++;
+
+//    hold_duration=(int)(PWM_FREQUENCY * 450 /Speed_V.Speed/BASE_FREQ); // 90% of half current wave as correction criteria
+    hold_duration=(int)(m_wave_duration_fft*0.95); // 90% of half current wave as correction criteria
+
+    inv_duration_cnt1= inv_duration_cnt_en1? inv_duration_cnt1+1: 0;
+    inv_duration_cnt2= inv_duration_cnt_en2? inv_duration_cnt2+1: 0;
+    inv_duration_cnt3= inv_duration_cnt_en3? inv_duration_cnt3+1: 0;
+
+    pos_duration_cnt1 = pos_duration_cnt_en1 ? pos_duration_cnt1 + 1 : 0;
+    pos_duration_cnt2 = pos_duration_cnt_en2 ? pos_duration_cnt2 + 1 : 0;
+    pos_duration_cnt3 = pos_duration_cnt_en3 ? pos_duration_cnt3 + 1 : 0;
+
+    //Vab correction
+    //    if positive duration exceed and other condition matched than do the inversion
+    if (ref_past1 == ref_volt1 &&  pos_duration_cnt1>hold_duration) {
+        inv1 = -1;
+        inv_duration_cnt_en1=1;
+        pos_duration_cnt_en1=0;
+    }
+    // if inverse duration exceed and other condition matched than reset the inversion
+    if (ref_past1 != ref_volt1 && inv_duration_cnt1>hold_duration){
+        inv1=1;
+        inv_duration_cnt_en1=0;
+        pos_duration_cnt_en1=1;
+    }
+
+    //Vbc correction
+    //    if positive duration exceed and other condition matched than do the inversion
+    if (ref_past2 == ref_volt2 &&  pos_duration_cnt2>hold_duration) {
+        inv2 = -1;
+        inv_duration_cnt_en2=1;
+        pos_duration_cnt_en2=0;
+    }
+    // if inverse duration exceed and other condition matched than reset the inversion
+    if (ref_past2 != ref_volt2 && inv_duration_cnt2>hold_duration){
+        inv2=1;
+        inv_duration_cnt_en2=0;
+        pos_duration_cnt_en2=1;
+    }
+
+    //Vac correction
+    //    if positive duration exceed and other condition matched than do the inversion
+    if (ref_past3 == ref_volt3 &&  pos_duration_cnt3>hold_duration) {
+        inv3 = -1;
+        inv_duration_cnt_en3=1;
+        pos_duration_cnt_en3=0;
+    }
+    // if inverse duration exceed and other condition matched than reset the inversion
+    if (ref_past3 != ref_volt3 && inv_duration_cnt3>hold_duration){
+        inv3=1;
+        inv_duration_cnt_en3=0;
+        pos_duration_cnt_en3=1;
+    }
 
     // voltage filtering
 //    voltage_filtering( fabs(phase_volt1_past), &phase_volt1, vol_filter_thres);
@@ -1638,13 +1682,7 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         //    ClarkeV_Beta  = (Vabc.Beta);
         //
 
-        // calculate sync speed from v (avoid unstable we )
-        // for SFF use
-        V_angle = _IQdiv(_IQatan2(Vabc.Beta,Vabc.Alpha),two_PI); // avoid  bad loops
-        if(V_angle<_IQ(0.0)) V_angle+=_IQ(1.0);
-        if(V_angle>_IQ(1.0)) V_angle-=_IQ(1.0);
-        Speed_V.ElecTheta = V_angle;
-        SPEED_FR_MACRO(Speed_V)
+
 
         // V-IR=EMF
         //---------------------------------------------------------------------------------
@@ -1653,6 +1691,15 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
         I_A=_IQmpy(motor->clarke.Alpha,CURRENT);
         I_B=_IQmpy(motor->clarke.Beta,CURRENT);
+
+        // calculate sync speed from v (avoid unstable we )
+        // for SFF use
+        //V_angle = _IQdiv(_IQatan2(Vabc.Beta,Vabc.Alpha),two_PI); // avoid  bad loops
+        V_angle = _IQdiv(_IQatan2(I_B,I_A),two_PI); // avoid  bad loops
+        if(V_angle<_IQ(0.0)) V_angle+=_IQ(1.0);
+        if(V_angle>_IQ(1.0)) V_angle-=_IQ(1.0);
+        Speed_V.ElecTheta = V_angle;
+        SPEED_FR_MACRO(Speed_V)
 
         // [1/s]*[s/(s+wc)]
         // calculate system speed and corner freq wc
@@ -1815,7 +1862,7 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         //--------------------------------------------------------------------------------------
         // mechanical speed
         Speed_est =_IQtoIQ15(Speed_F.Speed);
-        we_mech = _IQ15div(_IQ15mpy(_IQ15mpy(_IQ15mpy(Speed_est,BASE_FREQ),_IQ15(2)),PI),_IQtoIQ15(POLE_PAIRS));
+        we_mech = ((Speed_est * BASE_FREQ * 2.0f * PI) / POLE_PAIRS);
         // voltage model
         Torq_est=1000*_IQmpy(_IQmpy(_IQ15(1.5),POLE_PAIRS),(_IQmpy(Emf_ab_lpf2.Alpha,I_B)-_IQmpy(Emf_ab_lpf2.Beta,I_A)))-_IQmpy(_IQ(B_damp),we_mech);
 
@@ -1827,9 +1874,9 @@ inline void BuildLevel2(MOTOR_VARS * motor)
         Torque_DB = 1000*_IQmpy(_IQmpy(_IQ(1.5),POLE_PAIRS),(_IQmpy(Lamda_df,I_B)-_IQmpy(Lamda_qf,I_A)))-_IQmpy(_IQ(B_damp),we_mech);
 
         // power estimate
-//        Power1=(Vabc.Alpha*motor1.clarke.Alpha+Vabc.Beta*motor1.clarke.Beta)*Vdc*CURRENT;
+        Power1=(Vabc.Alpha*motor1.clarke.Alpha+Vabc.Beta*motor1.clarke.Beta)*Vdc*CURRENT*3/2;
 
-        Power1=2*(V_A*I_A+V_B*I_B)+V_A*I_B+V_B*I_A;
+//        Power1=2*(V_A*I_A+V_B*I_B)+V_A*I_B+V_B*I_A;
 
 
 
@@ -1854,17 +1901,18 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 //        rms(&rms_test, &rms_last,phase_volt1*Vdc,avg_load1,avg_limit1);
         rms(&rms_test, &rms_last,motor1.clarke.Alpha ,avg_load1,avg_limit1);
 
-        if (cur_offset_complete==0){
-            average(&offsetA_sum, &offsetA_avg,motor1.currentAs, avg_load1,avg_limit1);
-            average(&offsetB_sum, &offsetB_avg,motor1.currentBs, avg_load1,avg_limit1);
-        }
-        if(avg_load1==1)
-            cur_offset_complete=1;// stop current offset average
+        // dynamic current offset calibration
+        average(&offsetA_sum, &offsetA_avg,motor1.currentAs, avg_load1,avg_limit1);
+        average(&offsetB_sum, &offsetB_avg,motor1.currentBs, avg_load1,avg_limit1);
 
+        Cur_OffsetA=avg_load1? Cur_OffsetA+offsetA_avg : Cur_OffsetA;
+        Cur_OffsetB=avg_load1? Cur_OffsetB+offsetB_avg : Cur_OffsetB;
+
+        // demagnetization detection
         LD_mag=_IQmpy(LD_magcomp,_IQmag(LD_feature_avg_last[0],LD_feature_avg_last[1]));
-
         HI_DEMAG( HI_demag, lumda_h,  avg_test_last , LD_mag,_IQ(0));
 
+        // online torque estimation
         if (torq_i<torq_count){torq_i+=1;
         avg_load2=0;}
         else {avg_load2=1;
@@ -2015,8 +2063,8 @@ inline void BuildLevel2(MOTOR_VARS * motor)
 
     switch (dac_out) {
         case 1:
-            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.As + 1);
-            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Bs + 1);
+            dacAval = (Uint16) _IQtoQ11(scale * motor->clarke.Alpha + 1);
+            dacBval = (Uint16) _IQtoQ11(scale * motor->clarke.Beta + 1);
             break;
 
         case 2:
@@ -2062,9 +2110,21 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 10:
-            dacAval = (Uint16) _IQtoQ11(scale * Vabc.Bs+ _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(scale * Vabc.Cs+ _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale * Va+ _IQ(1));
+            dacBval = (Uint16) _IQtoQ11(scale * Vb+ _IQ(1));
+            dacCval = (Uint16) _IQtoQ11(scale * Vc+ _IQ(1));
             break;
+        case 11:
+            dacAval = (Uint16) _IQtoQ11(scale * ref_volt1);
+            dacBval = (Uint16) _IQtoQ11(scale * phase_volt1+ _IQ(1));
+            break;
+
+        case 12:
+            dacAval = (Uint16) _IQtoQ11(1.0 * m_wave_cnt/100);
+            dacBval = (Uint16) _IQtoQ11(1.0 * m_wave_duration/100);
+            dacCval = (Uint16) _IQtoQ11(scale * _IQabs(phase_volt1));
+            break;
+
 
         default:
             dacAval = (Uint16) _IQtoQ11(Vabc.Alpha + _IQ(1));
@@ -2277,14 +2337,14 @@ interrupt void scibRxFifoIsr(void)
             pkt_id.raw.first  = ReceivedChar[3];
             if (pkt_id.f==0){
                 rul_start_idx=head1; // fix the start index at fir  st package
-                cb_index=rul_start_idx+pkt_id.f;
+                cb_index=rul_start_idx+pkt_id.f*2;
             }
             else {
-                cb_index=rul_start_idx+pkt_id.f;
+                cb_index=rul_start_idx+pkt_id.f*2;
             }
 
             //circular buffer for FAST data  。
-            //cb_index=head1 +sci_count*2;
+//            cb_index=head1 +sci_count*2;
 
             cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
             send_data_package( device_number,AsramData.data1[cb_index], AsramData.data2[cb_index],AsramData.data3[cb_index],AsramData.data4[cb_index]);
@@ -2299,6 +2359,7 @@ interrupt void scibRxFifoIsr(void)
             sci_count=0;
             cmd_rcv_time=0;
             test_count=0;
+            rul_start_idx=0;
             // device response for master check
             GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
             scib_xmit(2);                               // from slave
@@ -2325,7 +2386,7 @@ interrupt void scibRxFifoIsr(void)
             myf_Ct_gain.raw.second = ReceivedChar[13];
             myf_Ct_gain.raw.first  = ReceivedChar[14];
 
-            POLE_PAIRS=ReceivedChar[11]/2;
+            POLE_PAIRS=ReceivedChar[15]/2;
             Flux_Rs=myf_Rs.f;
             Ls=myf_Ls.f;
             CURRENT=myf_Ct_gain.f;
@@ -2439,6 +2500,28 @@ interrupt void scibRxFifoIsr(void)
             while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
             GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
             break;
+
+        case 11:// command =11: get computation result from master
+
+
+            m_wave_duration_fft = (ReceivedChar[3] << 8) |  ReceivedChar[4];
+
+            // enable fast update
+            update_FAST_en=1;
+            sci_count=0;
+            // send the eco back
+            GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            scib_xmit(2);                               // cmd code: from slave
+            scib_xmit(device_number);
+//            int i1=0;
+//            for (i1 = 0; i1 < 13; i1++){
+//                scib_xmit(ReceivedChar[i1+3]);
+//            }
+            while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+            while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+            GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+            break;
+
         default: // for undefine command check
             sci_count=0;
             break;
