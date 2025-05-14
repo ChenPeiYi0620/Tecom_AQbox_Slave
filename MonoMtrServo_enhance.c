@@ -160,7 +160,7 @@ int autotune_enable = 0;
 _iq smooth_data[5],smooth_data_temp[5],F_angle3;
 _iq Flux_A_est,Flux_B_est,B_damp=0;
 int sm_length=5,count_i;
-int dac_out=2;
+int dac_out=3;
 
 int sci_sts_count=0;
 // external sensor
@@ -546,6 +546,7 @@ void GPIO_TogglePin(Uint16 pin)
     EALLOW;
     ClkCfgRegs.LOSPCP.bit.LSPCLKDIV=0x01; // set sci clock by SYSCLK/2 (100MHz)
     EDIS;
+
 
     configureDAC(DACA);
     configureDAC(DACB);
@@ -2074,9 +2075,9 @@ inline void BuildLevel2(MOTOR_VARS * motor)
             break;
 
         case 3:
-            dacAval = (Uint16) _IQtoQ11(scale*ref_volt2 + _IQ(1));
-            dacBval = (Uint16) _IQtoQ11(scale*trig2);
-            dacCval = (Uint16) _IQtoQ11(scale*inv2 + _IQ(1));
+            dacAval = (Uint16) _IQtoQ11(scale*_IQabs(phase_volt1));
+            dacBval = (Uint16) _IQtoQ11(scale*_IQabs(phase_volt2));
+            dacCval = (Uint16) _IQtoQ11(scale*ref_volt1);
             break;
 
         case 4:
@@ -2520,6 +2521,40 @@ interrupt void scibRxFifoIsr(void)
             while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
             while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
             GPIO_WritePin(TX_EN_GPIO,0);                // enable receiver
+            break;
+
+        case 12: //device data collection for RUL in one-shot (only for single device)
+
+            // entering communication mode for continuous transmit
+            communication_mode_active=1;
+
+            // determine the transmit data length
+            pkt_id.raw.second  = ReceivedChar[4];
+            pkt_id.raw.first  = ReceivedChar[3];
+            int collect_length=pkt_id.f;
+
+
+            GPIO_WritePin(TX_EN_GPIO,1);                // Receive complete, enable TX
+            cb_index=head1;
+            Uint16 simple_crc=~(cb_index&0xFFFF);
+            scib_uint(cb_index);
+            int j;
+            for (j=0; j<collect_length; j++){
+                scib_uint(AsramData.data1[cb_index]);//AsramData.data1[cb_index]
+                scib_uint(AsramData.data2[cb_index]);
+                scib_uint(AsramData.data3[cb_index]);
+                scib_uint(AsramData.data4[cb_index]);
+                cb_index++;
+                cb_index= (cb_index>=MAX_EMIF_length) ? cb_index%MAX_EMIF_length : cb_index; // redirect pointer if overflow
+            }
+            scib_uint(simple_crc);
+            while(ScibRegs.SCIFFTX.bit.TXFFST != 0) {}  // wait until TXFF buffer clear
+            while(ScibRegs.SCICTL2.bit.TXEMPTY != 1) {} // wait until transmit complete
+
+            sci_count++;                                // for sending times check
+
+            GPIO_WritePin(TX_EN_GPIO,0);                // Transmit complete, enable RX
+
             break;
 
         default: // for undefine command check

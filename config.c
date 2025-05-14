@@ -129,26 +129,28 @@ void InitMotor1SpiGpio(void)
 }
 void InitEcapGpio(void)
 {
-       GPIO_SetupPinOptions(Ecap1_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap1_GPIO, GPIO_INPUT, GPIO_ASYNC);
        GPIO_SetupPinMux(Ecap1_GPIO, 0, Ecap1_MUX);
 
-       GPIO_SetupPinOptions(Ecap2_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap2_GPIO, GPIO_INPUT, GPIO_ASYNC);
        GPIO_SetupPinMux(Ecap2_GPIO, 0, Ecap2_MUX);
 
-       GPIO_SetupPinOptions(Ecap3_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap3_GPIO, GPIO_INPUT, GPIO_ASYNC);
        GPIO_SetupPinMux(Ecap3_GPIO, 0, Ecap3_MUX);
 
-       GPIO_SetupPinOptions(Ecap4_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap4_GPIO, GPIO_INPUT, GPIO_ASYNC);
        GPIO_SetupPinMux(Ecap4_GPIO, 0, Ecap4_MUX);
 
-       GPIO_SetupPinOptions(Ecap5_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap5_GPIO, GPIO_INPUT, GPIO_ASYNC);
        GPIO_SetupPinMux(Ecap5_GPIO, 0, Ecap5_MUX);
 
-       GPIO_SetupPinOptions(Ecap6_GPIO, GPIO_INPUT, GPIO_QUAL3);
+       GPIO_SetupPinOptions(Ecap6_GPIO, GPIO_INPUT, GPIO_ASYNC);// GPIO_QUAL3
        GPIO_SetupPinMux(Ecap6_GPIO, 0, Ecap6_MUX);
 
        EALLOW;
-       GpioCtrlRegs.GPACTRL.bit.QUALPRD0=0x0A; // 13*1/100M s= 130ns clock base, thus the AQ window is 130*3=390ns
+//       GpioCtrlRegs.GPACTRL.bit.QUALPRD0=0x0A; // 13*1/100M s= 130ns clock base, thus the AQ window is 130*3=390ns
+       GpioCtrlRegs.GPACTRL.bit.QUALPRD0=0x01; // 13*1/100M s= 130ns clock base, thus the AQ window is 20*3=60ns
+
        EDIS;
 
        return;
